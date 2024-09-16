@@ -9,18 +9,26 @@ set(src_files_vulkan
     Vulkan/VulkanBaseRenderer.hpp
 )
 
+set(src_files_utils
+    utils/Exception.hpp
+)
+
 set(src_files
     main.cpp
+    Options.hpp
+    Options.cpp
 )
 
 source_group("Asserts" FILES ${src_files_asserts})
 source_group("Vulkan" FILES ${src_files_vulkan})
 source_group("Main" FILES ${src_files})
+source_group("Utils" FILES ${src_files_utils})
 
 
 add_executable(${exe_name}
     ${src_files_asserts}
     ${src_files_vulkan}
+    ${src_files_utils}
     ${src_files}
 )
 
@@ -39,8 +47,7 @@ target_include_directories(${exe_name} PRIVATE ${CPP_BASE64_INCLUDE_DIRS})
 #         )
 # endif()
 
-# target_link_libraries(${exe_name} PRIVATE fmt::fmt CURL::libcurl Boost::boost Boost::exception Boost::program_options glm::glm imgui::imgui tinyobjloader::tinyobjloader draco::draco ${Vulkan_LIBRARIES} ${extra_libs})
-target_link_libraries(${exe_name} PRIVATE fmt::fmt CURL::libcurl Boost::boost Boost::exception Boost::program_options glm::glm imgui::imgui tinyobjloader::tinyobjloader ${Vulkan_LIBRARIES} ${extra_libs})
+target_link_libraries(${exe_name} PRIVATE fmt::fmt CURL::libcurl Boost::boost Boost::exception Boost::program_options glm::glm imgui::imgui tinyobjloader::tinyobjloader draco::draco ${Vulkan_LIBRARIES} ${extra_libs})
 target_link_libraries(${exe_name} PRIVATE glfw)
 
 if(WIN32)

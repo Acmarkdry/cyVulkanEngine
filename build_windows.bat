@@ -11,13 +11,13 @@ for %%X in (msbuild.exe) do (set FOUND=%%~$PATH:X)
 if defined FOUND (
 set MSBUILD=msbuild
 ) ELSE (
-set MSBUILD="%programfiles(x86)%\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin\amd64\msbuild.exe"
+set MSBUILD="%programfiles(x86)%\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\amd64\msbuild.exe"
 )
 
 cd build || goto :error
 mkdir windows
 cd windows || goto :error
-%CMAKE% -D WITH_OIDN=0 -D WITH_AVIF=0 -D VCPKG_TARGET_TRIPLET=x64-windows-static -D CMAKE_TOOLCHAIN_FILE=../vcpkg.windows/scripts/buildsystems/vcpkg.cmake -G "Visual Studio 16 2019" -A "x64" ../.. || goto :error
+%CMAKE% -D WITH_OIDN=0 -D WITH_AVIF=0 -D VCPKG_TARGET_TRIPLET=x64-windows-static -D CMAKE_TOOLCHAIN_FILE=../vcpkg.windows/scripts/buildsystems/vcpkg.cmake -G "Visual Studio 17 2022" -A "x64" ../.. || goto :error
 %MSBUILD% gkNextRenderer.sln /p:Configuration=Release /verbosity:minimal /nologo || goto :error
 cd ..
 cd ..
