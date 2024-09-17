@@ -1,0 +1,134 @@
+#include "Instance.h"
+
+#include <stdexcept>
+
+#include "Enumerate.hpp"
+#include "Utils/Exception.hpp"
+
+namespace Vulkan
+{
+Instance::Instance(const class Window& window, const std::vector<const char*>& validationLayers, uint32_t vulkanVersion) :
+	window_(window),
+	validationLayers_(validationLayers)
+{
+	// Check the minimum version.
+	CheckVulkanMinimumVersion(vulkanVersion);
+
+	// Get the list of required extensions.
+	auto extensions = window.GetRequiredInstanceExtensions();
+
+	// Check the validation layers and add them to the list of required extensions.
+	CheckVulkanValidationLayerSupport(validationLayers);
+	// todo 了解清楚这里的几个扩展都是啥
+	if (!validationLayers.empty())
+	{
+		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+	}
+
+	extensions.push_back(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
+#if WIN32
+	extensions.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+#endif	
+#if __APPLE__
+	extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+#endif
+
+#if ANDROID
+  	extensions.push_back("VK_KHR_surface");
+  	extensions.push_back("VK_KHR_android_surface");
+	extensions.push_back("VK_EXT_swapchain_colorspace");
+#endif
+	// Create the Vulkan instance.
+	VkApplicationInfo appInfo = {};
+	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+	appInfo.pApplicationName = "gkNextRenderer";
+	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+	appInfo.pEngineName = "No Engine";
+	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+	appInfo.apiVersion = vulkanVersion;
+
+	VkInstanceCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+	createInfo.pApplicationInfo = &appInfo;
+	createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+	createInfo.ppEnabledExtensionNames = extensions.data();
+	createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+	createInfo.ppEnabledLayerNames = validationLayers.data();
+#if __APPLE__	
+	createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#endif
+	Check(vkCreateInstance(&createInfo, nullptr, &instance_),
+		"create instance");
+
+	GetVulkanPhysicalDevices();
+	GetVulkanLayers();
+	GetVulkanExtensions();
+}
+	
+	Instance::~Instance()
+	{
+		if (instance_ != nullptr)
+		{
+			vkDestroyInstance(instance_, nullptr);
+			instance_ = nullptr;
+		}
+	}
+
+
+	void Instance::GetVulkanExtensions()
+	{
+		GetEnumerateVector(static_cast<const char*>(nullptr), vkEnumerateInstanceExtensionProperties, extensions_);
+	}
+
+	void Instance::GetVulkanLayers()
+	{
+		GetEnumerateVector(vkEnumerateInstanceLayerProperties, layers_);
+	}
+
+	void Instance::GetVulkanPhysicalDevices()
+	{
+		GetEnumerateVector(instance_, vkEnumeratePhysicalDevices, physicalDevices_);
+
+		if (physicalDevices_.empty())
+		{
+			Throw(std::runtime_error("found no Vulkan physical devices"));
+		}
+	}
+	
+	void Instance::CheckVulkanMinimumVersion(const uint32_t minVersion)
+	{
+#if !ANDROID
+		uint32_t version;
+		Check(vkEnumerateInstanceVersion(&version),
+			"query instance version");
+
+		if (minVersion > version)
+		{
+			std::ostringstream out;
+			out << "minimum required version not found (required " << std::to_string(Version(minVersion));
+			out << ", found " << std::to_string(Version(version)) << ")";
+
+			Throw(std::runtime_error(out.str()));
+		}
+#endif
+	}
+
+	void Instance::CheckVulkanValidationLayerSupport(const std::vector<const char*>& validationLayers)
+	{
+		const auto availableLayers = GetEnumerateVector(vkEnumerateInstanceLayerProperties);
+
+		for (const char* layer : validationLayers)
+		{
+			auto result = std::find_if(availableLayers.begin(), availableLayers.end(), [layer](const VkLayerProperties& layerProperties)
+			{
+				return strcmp(layer, layerProperties.layerName) == 0;
+			});
+
+			if (result == availableLayers.end())
+			{
+				Throw(std::runtime_error("could not find the requested validation layer: '" + std::string(layer) + "'"));
+			}
+		}
+	}
+	
+}

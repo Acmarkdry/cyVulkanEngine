@@ -22,4 +22,4 @@ public:
 	
 };
 
-inline const Options* GOptions = nullptr;
+inline const Options* GOption = nullptr;
