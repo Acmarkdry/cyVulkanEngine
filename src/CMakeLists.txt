@@ -1,20 +1,15 @@
 set(exe_name ${MAIN_PROJECT})
 
-set(src_files_asserts
-    Asserts/Vertex.hpp
-    )
-
-
+file(GLOB src_files_asserts Asserts/*)
 file(GLOB src_files_vulkan Vulkan/*)
-
-set(src_files_utils
-    utils/Exception.hpp
-)
+file(GLOB src_files_utils Utils/*)
 
 set(src_files
     main.cpp
     Options.hpp
     Options.cpp
+    TaskCoordinator.cpp
+    TaskCoordinator.hpp
 )
 
 source_group("Asserts" FILES ${src_files_asserts})

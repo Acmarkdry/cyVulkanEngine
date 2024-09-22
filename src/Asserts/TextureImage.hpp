@@ -1,0 +1,33 @@
+#pragma once
+#include <memory>
+
+namespace Vulkan
+{
+	class CommandPool;
+	class Device;
+	class Image;
+	class ImageView;
+	class Sampler;
+	class DeviceMemory;
+}
+
+namespace Assets
+{
+	class TextureImage
+	{
+	public:
+		TextureImage(Vulkan::CommandPool& command_pool,size_t width,size_t height,bool hdr,const unsigned char* data);
+		~TextureImage();
+
+		const Vulkan::ImageView& ImageView() const {return *imageView_;}
+		const Vulkan::Sampler& Sampler() const {return *sampler_;}
+		void MainThreadPostLoading(Vulkan::CommandPool& commandPool);
+		
+	private:
+		std::unique_ptr<Vulkan::Image> image_;
+		std::unique_ptr<Vulkan::DeviceMemory> imageMemory_;
+		std::unique_ptr<Vulkan::ImageView> imageView_;
+		std::unique_ptr<Vulkan::Sampler> sampler_;
+	};	
+}
+
