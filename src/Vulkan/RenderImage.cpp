@@ -56,6 +56,7 @@ namespace Vulkan {
 
     ExtHandle RenderImage::GetExternalHandle() const
     {
+        // 在windows平台上获取vulkan的外部句柄 从而实现跨api的资源共享
         ExtHandle handle;
         #if WIN32 && !defined(__MINGW32__)
         VkMemoryGetWin32HandleInfoKHR handleInfo = { VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR };

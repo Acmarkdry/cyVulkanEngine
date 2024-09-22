@@ -1,4 +1,4 @@
-#include "Image.hpp"
+﻿#include "Image.hpp"
 #include "Buffer.hpp"
 #include "DepthBuffer.hpp"
 #include "Device.hpp"
@@ -97,6 +97,10 @@ VkMemoryRequirements Image::GetMemoryRequirements() const
 
 void Image::TransitionImageLayout(CommandPool& commandPool, VkImageLayout newLayout)
 {
+	// VkCmdCopyBufferToImage调用之前，需要让图像满足一定的布局要求，所以有了这个函数
+	// image memory barrier 来对图像布局进行变换，
+	// 指令缓冲的提交会隐式的进行 VK_ACCESS_HOST_WRITE_BIT同步
+	
 	SingleTimeCommands::Submit(commandPool, [&](VkCommandBuffer commandBuffer)
 	{
 		VkImageMemoryBarrier barrier = {};
@@ -104,7 +108,7 @@ void Image::TransitionImageLayout(CommandPool& commandPool, VkImageLayout newLay
 		barrier.oldLayout = imageLayout_;
 		barrier.newLayout = newLayout;
 		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; // 不进行队列所有权维护，所以直接设置值为VK_QUEUE_FAMILY_IGNORED
 		barrier.image = image_;
 		barrier.subresourceRange.baseMipLevel = 0;
 		barrier.subresourceRange.levelCount = 1;
@@ -127,7 +131,7 @@ void Image::TransitionImageLayout(CommandPool& commandPool, VkImageLayout newLay
 
 		VkPipelineStageFlags sourceStage;
 		VkPipelineStageFlags destinationStage;
-
+		// 需要根据布局来变换barrier掩码
 		if (imageLayout_ == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) 
 		{
 			barrier.srcAccessMask = 0;
@@ -165,13 +169,14 @@ void Image::TransitionImageLayout(CommandPool& commandPool, VkImageLayout newLay
 
 void Image::CopyFrom(CommandPool& commandPool, const Buffer& buffer)
 {
+	// 将数据复制到图像的哪一个部分
 	SingleTimeCommands::Submit(commandPool, [&](VkCommandBuffer commandBuffer)
 	{
 		VkBufferImageCopy region = {};
 		region.bufferOffset = 0;
-		region.bufferRowLength = 0;
+		region.bufferRowLength = 0; // 这样就可以对每行图像数据使用额外的空间进行对齐
 		region.bufferImageHeight = 0;
-		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // 用于指定数据被复制到图像的哪一部分
 		region.imageSubresource.mipLevel = 0;
 		region.imageSubresource.baseArrayLayer = 0;
 		region.imageSubresource.layerCount = 1;

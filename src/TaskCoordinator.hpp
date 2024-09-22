@@ -19,7 +19,8 @@ namespace details
         constexpr atomic_acq_rel() noexcept = default;
 
         constexpr atomic_acq_rel(T desired) noexcept : m_value{ std::forward<T>(desired) } {}
-
+        // forward 用于完美转发参数，避免不必要的拷贝或者移动操作
+        
         atomic_acq_rel(const atomic_acq_rel&) = delete;
         atomic_acq_rel(atomic_acq_rel&&) = delete;
 
@@ -88,7 +89,7 @@ namespace details
         }
 
     private:
-        std::atomic<T> m_value;
+        std::atomic<T> m_value; // 用于实现原子操作，处理多线程
     };
 }
 
