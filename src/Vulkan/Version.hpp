@@ -1,11 +1,11 @@
 #pragma once
-#include <string>
 
 #include "Vulkan.hpp"
-#include<fmt/format.h>
+#include <fmt/format.h>
 
-namespace Vulkan
+namespace Vulkan 
 {
+
 	class Version final
 	{
 	public:
@@ -39,6 +39,5 @@ namespace Vulkan
 			return fmt::format("{}.{}.{}", version.Major, version.Minor, version.Patch);
 		}
 	};
-	
-}
 
+}

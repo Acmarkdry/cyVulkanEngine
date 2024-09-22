@@ -1,8 +1,7 @@
 #pragma once
-#include <cstdint>
-#include <vector>
 
 #include "Vulkan.hpp"
+#include <vector>
 
 namespace Vulkan
 {
@@ -11,7 +10,7 @@ namespace Vulkan
 	class Instance final
 	{
 	public:
-		
+
 		VULKAN_NON_COPIABLE(Instance)
 
 		Instance(const Window& window, const std::vector<const char*>& validationLayers, uint32_t vulkanVersion);
@@ -25,23 +24,22 @@ namespace Vulkan
 		const std::vector<const char*>& ValidationLayers() const { return validationLayers_; }
 
 	private:
+
 		void GetVulkanExtensions();
 		void GetVulkanLayers();
 		void GetVulkanPhysicalDevices();
 
 		static void CheckVulkanMinimumVersion(uint32_t minVersion);
-
 		static void CheckVulkanValidationLayerSupport(const std::vector<const char*>& validationLayers);
 
 		const class Window& window_;
 		const std::vector<const char*> validationLayers_;
 
-		VULKAN_HANDLE(VkInstance,instance_);
+		VULKAN_HANDLE(VkInstance, instance_)
 
 		std::vector<VkExtensionProperties> extensions_;
 		std::vector<VkLayerProperties> layers_;
 		std::vector<VkPhysicalDevice> physicalDevices_;
 	};
-	
-}
 
+}

@@ -4,32 +4,8 @@ set(src_files_asserts
     Asserts/Vertex.hpp
     )
 
-set(src_files_vulkan
-    Vulkan/VulkanBaseRenderer.cpp
-    Vulkan/VulkanBaseRenderer.hpp
-    Vulkan/Window.cpp
-    Vulkan/Window.hpp
-    Vulkan/WindowConfig.hpp
-    Vulkan/Vulkan.cpp
-    Vulkan/Vulkan.hpp
-    Vulkan/SingleTimeCommands.hpp
-    Vulkan/CommandBuffers.hpp
-    Vulkan/CommandBuffers.cpp
-    Vulkan/DebugUtils.hpp
-    Vulkan/DebugUtils.cpp
-    Vulkan/Enumerate.hpp
-    
-    Vulkan/Device.cpp
-    Vulkan/Device.hpp
-    Vulkan/Surface.cpp
-    Vulkan/Surface.hpp
-    Vulkan/Instance.cpp
-    Vulkan/Instance.hpp
-    Vulkan/Version.cpp
-    Vulkan/Version.hpp
-    Vulkan/DebugUtilsMessenger.cpp
-    Vulkan/DebugUtilsMessenger.hpp
-)
+
+file(GLOB src_files_vulkan Vulkan/*)
 
 set(src_files_utils
     utils/Exception.hpp

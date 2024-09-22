@@ -8,10 +8,6 @@ namespace  Vulkan {
 template <class TValue>
 inline void GetEnumerateVector(VkResult(enumerate) (uint32_t*, TValue*), std::vector<TValue>& vector)
 {
-	/*
-	 * 永远将vulkan的枚举函数的结果保存到一个std::vector里面
-	 * vkResult(enumerate)(uint32 Tvalue)代表一个函数指针
-	 */
 	uint32_t count = 0;
 	Check(enumerate(&count, nullptr),
 		"enumerate");

@@ -1,8 +1,9 @@
 #include "Window.hpp"
 #include "Utils/Exception.hpp"
-// #include "Utilities/StbImage.hpp"
-#include <stb_image.h>
+#include "Utils/StbImage.hpp"
 #include <fmt/format.h>
+
+#include "Options.hpp"
 
 #if ANDROID
 #include <time.h>

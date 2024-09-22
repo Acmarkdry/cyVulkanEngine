@@ -1,33 +1,39 @@
 #include "Device.hpp"
-
-#include <set>
-#include <string>
-
 #include "Enumerate.hpp"
-#include "Utils/Exception.hpp"
+#include "Instance.hpp"
+#include "Surface.hpp"
+#include "Utilities/Exception.hpp"
+#include "Vulkan/RayTracing/DeviceProcedures.hpp"
+#include <algorithm>
+#include <set>
 
-namespace Vulkan
+namespace Vulkan {
+
+namespace
 {
 	std::vector<VkQueueFamilyProperties>::const_iterator FindQueue(
 		const std::vector<VkQueueFamilyProperties>& queueFamilies,
-		const std::string&name,
-		const VkQueueFlags& requiredBits,
-		const VkQueueFlags& excludeBits,
+		const std::string& name,
+		const VkQueueFlags requiredBits,
+		const VkQueueFlags excludedBits,
 		uint32_t minCount)
 	{
-		const auto family = std::find_if(queueFamilies.begin(),queueFamilies.end(),[requiredBits,excludeBits,minCount](const VkQueueFamilyProperties& queueFamily)
+		const auto family = std::find_if(queueFamilies.begin(), queueFamilies.end(), [requiredBits, excludedBits, minCount](const VkQueueFamilyProperties& queueFamily)
 		{
-			return queueFamily.queueCount >= minCount && queueFamily.queueFlags & requiredBits && !(queueFamily.queueFlags & excludeBits);
+			return 
+				queueFamily.queueCount >= minCount && 
+				queueFamily.queueFlags & requiredBits &&
+				!(queueFamily.queueFlags & excludedBits);
 		});
 
-		if(family == queueFamilies.end())
+		if (family == queueFamilies.end())
 		{
 			Throw(std::runtime_error("found no matching " + name + " queue"));
 		}
 
 		return family;
 	}
-
+}
 
 Device::Device(
 	VkPhysicalDevice physicalDevice, 
@@ -133,49 +139,50 @@ Device::Device(
 	deviceProcedures_.reset(new DeviceProcedures(*this, true, true));
 }
 
-	Device::~Device()
+Device::~Device()
+{
+	if (device_ != nullptr)
 	{
-		if(device_ != nullptr)
-		{
-			vkDestroyDevice(device_,nullptr),
-			device_ = nullptr;
-			deviceProcedures_.reset();
-		}
+		vkDestroyDevice(device_, nullptr);
+		device_ = nullptr;
+		deviceProcedures_.reset();
+	}
+}
+
+void Device::WaitIdle() const
+{
+	Check(vkDeviceWaitIdle(device_),
+		"wait for device idle");
+}
+
+void Device::CheckRequiredExtensions(VkPhysicalDevice physicalDevice, const std::vector<const char*>& requiredExtensions) const
+{
+	const auto availableExtensions = GetEnumerateVector(physicalDevice, static_cast<const char*>(nullptr), vkEnumerateDeviceExtensionProperties);
+	std::set<std::string> required(requiredExtensions.begin(), requiredExtensions.end());
+
+	for (const auto& extension : availableExtensions) 
+	{
+		required.erase(extension.extensionName);
 	}
 
-
-	void Device::WaitIdle() const
+	if (!required.empty())
 	{
-		Check(vkDeviceWaitIdle(device_),"wait for device idle");
-	}
+		bool first = true;
+		std::string extensions;
 
-
-	void Device::CheckRequiredExtensions(VkPhysicalDevice physicalDevice, const std::vector<const char*>& requiredExtensions) const
-	{
-		const auto avaliableExtensions = GetEnumerateVector(physicalDevice,static_cast<const char *>(nullptr),vkEnumerateDeviceExtensionProperties);
-		std::set<std::string> required(requiredExtensions.begin(),requiredExtensions.end());
-
-		for(const auto&extesion:avaliableExtensions)
+		for (const auto& extension : required)
 		{
-			required.erase(extesion);
-		}
-		if(!required.empty())
-		{
-			bool first = true;
-			std::string extensions;
-
-			for(const auto&extension :required)
+			if (!first)
 			{
-				if(!first)
-					extensions += ", ";
-
-				extensions += extension;
-				first = false;
+				extensions += ", ";
 			}
 
-			Throw(std::runtime_error("missing required extensions: " + extensions));
+			extensions += extension;
+			first = false;
 		}
-		
+
+		Throw(std::runtime_error("missing required extensions: " + extensions));
 	}
+}
 
 }

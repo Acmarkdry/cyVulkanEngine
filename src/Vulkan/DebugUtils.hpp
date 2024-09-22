@@ -7,17 +7,19 @@ namespace Vulkan
 	class DebugUtils final
 	{
 	public:
+
 		VULKAN_NON_COPIABLE(DebugUtils)
 
-		explicit DebugUtils(VkInstance instance); // 保证不被隐式调用
+		explicit DebugUtils(VkInstance instance);		
 		~DebugUtils() = default;
+
 
 		void SetDevice(VkDevice device)
 		{
 			device_ = device;
 		}
 
-		void SetObjectName(const VkAccelerationStructureKHR& object,const char *name) const {SetObjectName(object,name,VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR);}
+		void SetObjectName(const VkAccelerationStructureKHR& object, const char* name) const { SetObjectName(object, name, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR); }
 		void SetObjectName(const VkBuffer& object, const char* name) const { SetObjectName(object, name, VK_OBJECT_TYPE_BUFFER); }
 		void SetObjectName(const VkCommandBuffer& object, const char* name) const { SetObjectName(object, name, VK_OBJECT_TYPE_COMMAND_BUFFER); }
 		void SetObjectName(const VkDescriptorSet& object, const char* name) const { SetObjectName(object, name, VK_OBJECT_TYPE_DESCRIPTOR_SET); }
@@ -32,22 +34,29 @@ namespace Vulkan
 		void SetObjectName(const VkSemaphore& object, const char* name) const { SetObjectName(object, name, VK_OBJECT_TYPE_SEMAPHORE); }
 		void SetObjectName(const VkShaderModule& object, const char* name) const { SetObjectName(object, name, VK_OBJECT_TYPE_SHADER_MODULE); }
 		void SetObjectName(const VkSwapchainKHR& object, const char* name) const { SetObjectName(object, name, VK_OBJECT_TYPE_SWAPCHAIN_KHR); }
-
+		
 	private:
-		template<typename T>
-		void SetObjectName(const T& object,const char* name,VkObjectType type) const
+
+		template <typename T>
+		void SetObjectName(const T& object, const char* name, VkObjectType type) const
 		{
-			VkDebugUtilsObjectNameInfoEXT info = {}; // 用于为vulkan对象分配调试名称，用于调试和开发过程中更容易识别vulkan对象
+#if !ANDROID
+#ifndef NDEBUG
+			VkDebugUtilsObjectNameInfoEXT info = {};
 			info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
 			info.pNext = nullptr;
 			info.objectHandle = reinterpret_cast<const uint64_t&>(object);
 			info.objectType = type;
 			info.pObjectName = name;
-
-			Check(vkSetDebugUtilsObjectNameExt_(device_,&info),"set object name");
+			
+			Check(vkSetDebugUtilsObjectNameEXT_(device_, &info), "set object name");
+#endif
+#endif
 		}
 
-		const PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameExt_;
+		const PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT_;
+
 		VkDevice device_{};
-	};	
+	};
+
 }

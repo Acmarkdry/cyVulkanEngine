@@ -1,12 +1,13 @@
-#include "Instance.h"
-
-#include <stdexcept>
-
+#include "Instance.hpp"
 #include "Enumerate.hpp"
+#include "Version.hpp"
+#include "Window.hpp"
 #include "Utils/Exception.hpp"
+#include <algorithm>
+#include <sstream>
 
-namespace Vulkan
-{
+namespace Vulkan {
+
 Instance::Instance(const class Window& window, const std::vector<const char*>& validationLayers, uint32_t vulkanVersion) :
 	window_(window),
 	validationLayers_(validationLayers)
@@ -19,7 +20,7 @@ Instance::Instance(const class Window& window, const std::vector<const char*>& v
 
 	// Check the validation layers and add them to the list of required extensions.
 	CheckVulkanValidationLayerSupport(validationLayers);
-	// todo 了解清楚这里的几个扩展都是啥
+
 	if (!validationLayers.empty())
 	{
 		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -64,71 +65,70 @@ Instance::Instance(const class Window& window, const std::vector<const char*>& v
 	GetVulkanLayers();
 	GetVulkanExtensions();
 }
-	
-	Instance::~Instance()
+
+Instance::~Instance()
+{
+	if (instance_ != nullptr)
 	{
-		if (instance_ != nullptr)
+		vkDestroyInstance(instance_, nullptr);
+		instance_ = nullptr;
+	}
+}
+
+void Instance::GetVulkanExtensions()
+{
+	GetEnumerateVector(static_cast<const char*>(nullptr), vkEnumerateInstanceExtensionProperties, extensions_);
+}
+
+void Instance::GetVulkanLayers()
+{
+	GetEnumerateVector(vkEnumerateInstanceLayerProperties, layers_);
+}
+
+void Instance::GetVulkanPhysicalDevices()
+{
+	GetEnumerateVector(instance_, vkEnumeratePhysicalDevices, physicalDevices_);
+
+	if (physicalDevices_.empty())
+	{
+		Throw(std::runtime_error("found no Vulkan physical devices"));
+	}
+}
+
+void Instance::CheckVulkanMinimumVersion(const uint32_t minVersion)
+{
+	#if !ANDROID
+	uint32_t version;
+	Check(vkEnumerateInstanceVersion(&version),
+		"query instance version");
+
+	if (minVersion > version)
+	{
+		std::ostringstream out;
+		out << "minimum required version not found (required " << to_string(Version(minVersion));
+		out << ", found " << to_string(Version(version)) << ")";
+
+		Throw(std::runtime_error(out.str()));
+	}
+	#endif
+}
+
+void Instance::CheckVulkanValidationLayerSupport(const std::vector<const char*>& validationLayers)
+{
+	const auto availableLayers = GetEnumerateVector(vkEnumerateInstanceLayerProperties);
+
+	for (const char* layer : validationLayers)
+	{
+		auto result = std::find_if(availableLayers.begin(), availableLayers.end(), [layer](const VkLayerProperties& layerProperties)
 		{
-			vkDestroyInstance(instance_, nullptr);
-			instance_ = nullptr;
+			return strcmp(layer, layerProperties.layerName) == 0;
+		});
+
+		if (result == availableLayers.end())
+		{
+			Throw(std::runtime_error("could not find the requested validation layer: '" + std::string(layer) + "'"));
 		}
 	}
+}
 
-
-	void Instance::GetVulkanExtensions()
-	{
-		GetEnumerateVector(static_cast<const char*>(nullptr), vkEnumerateInstanceExtensionProperties, extensions_);
-	}
-
-	void Instance::GetVulkanLayers()
-	{
-		GetEnumerateVector(vkEnumerateInstanceLayerProperties, layers_);
-	}
-
-	void Instance::GetVulkanPhysicalDevices()
-	{
-		GetEnumerateVector(instance_, vkEnumeratePhysicalDevices, physicalDevices_);
-
-		if (physicalDevices_.empty())
-		{
-			Throw(std::runtime_error("found no Vulkan physical devices"));
-		}
-	}
-	
-	void Instance::CheckVulkanMinimumVersion(const uint32_t minVersion)
-	{
-#if !ANDROID
-		uint32_t version;
-		Check(vkEnumerateInstanceVersion(&version),
-			"query instance version");
-
-		if (minVersion > version)
-		{
-			std::ostringstream out;
-			out << "minimum required version not found (required " << std::to_string(Version(minVersion));
-			out << ", found " << std::to_string(Version(version)) << ")";
-
-			Throw(std::runtime_error(out.str()));
-		}
-#endif
-	}
-
-	void Instance::CheckVulkanValidationLayerSupport(const std::vector<const char*>& validationLayers)
-	{
-		const auto availableLayers = GetEnumerateVector(vkEnumerateInstanceLayerProperties);
-
-		for (const char* layer : validationLayers)
-		{
-			auto result = std::find_if(availableLayers.begin(), availableLayers.end(), [layer](const VkLayerProperties& layerProperties)
-			{
-				return strcmp(layer, layerProperties.layerName) == 0;
-			});
-
-			if (result == availableLayers.end())
-			{
-				Throw(std::runtime_error("could not find the requested validation layer: '" + std::string(layer) + "'"));
-			}
-		}
-	}
-	
 }
