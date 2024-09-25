@@ -1,5 +1,6 @@
 #pragma once
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 
 namespace Assets
 {
@@ -50,6 +51,7 @@ namespace Assets
 		float Fuzziness;
 		Enum MaterialModel;
 		float Metalness;
+		float RefractionIndex;
 		float RefractionIndex2;
 		float Reserverd1;
 		float Reserverd2

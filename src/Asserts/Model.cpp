@@ -1,1 +1,560 @@
 #include "Model.hpp"
+#include "CornellBox.hpp"
+#include "Procedural.hpp"
+#include "Sphere.hpp"
+#include "Utils/Exception.hpp"
+#include "Utilities/Console.hpp"
+#include "Utilities/FileHelper.hpp"
+#include "Utilities/Math.hpp"
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtx/hash.hpp>
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+#include <tiny_obj_loader.h>
+#include <chrono>
+#include <filesystem>
+#include <fmt/format.h>
+#include <unordered_map>
+#include <vector>
+
+#define _USE_MATH_DEFINES
+#include <math.h>
+
+#define TINYGLTF_IMPLEMENTATION
+#define TINYGLTF_ENABLE_DRACO
+// #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <tiny_gltf.h>
+#include <fmt/format.h>
+
+#include "Options.hpp"
+#include "Texture.hpp"
+#include "Vulkan/Sampler.hpp"
+
+#define FLATTEN_VERTICE 1
+
+typedef std::unordered_map<std::string,int32_t> uo_map_tex_t;
+
+namespace std
+{
+	template<>
+	struct hash<Assets::Vertex> final
+	{
+		size_t operator()(Assets::Vertex const &vertex) const noexcept
+		{
+			return
+				Combine(hash<glm::vec3>()(vertex.Position),
+						Combine(hash<glm::vec3>()(vertex.Normal),
+								Combine(hash<glm::vec2>()(vertex.TexCoord),
+										hash<int>()(vertex.MaterialIndex))));
+		}
+
+	private:
+		static size_t Combine(size_t hash0,size_t hash1)
+		{
+            return hash0 ^ (hash1 + 0x9e3779b9 + (hash0 << 6) + (hash0 >> 2));
+		}
+	};
+	
+}
+
+
+namespace Assets
+{
+	void ParseGltfNode(std::vector<Assets::Node>& out_nodes,Assets::CameraInitialSate& out_camera,std::vector<LightObject>& out_lights,glm::mat4 parentTransform,tinygltf::Model& model,int node_idx,int modelIdx)
+	{
+		tinygltf::Node& node = model.nodes[node_idx];
+
+		glm::mat4 transform = glm::mat4(1);
+		if(node.matrix.empty())
+		{
+			glm::vec3 translation = node.translation.empty() ? glm::vec3(0) : glm::vec3(node.translation[0],node.translation[1],node.translation[2]);
+
+			glm::vec3 scaling = node.scale.empty() ? glm::vec3(1) : glm::vec3(node.scale[0],node.scale[1],node.scale[2]);
+			glm::quat quaternion = node.rotation.empty() ? glm::quat(1,0,0,0) : glm::quat(
+				static_cast<float>(node.rotation[3]),
+				static_cast<float>(node.rotation[0]),
+				static_cast<float>(node.rotation[1]),
+				static_cast<float>(node.rotation[2])
+			);
+			// todo 这里的数学东西可以补一下
+
+			quaternion = glm::normalize(quaternion);
+			glm::mat4 t = glm::translate(glm::mat4(1),translation);
+			glm::mat4 r = glm::toMat4(quaternion);
+			glm::mat4 s = glm::scale(glm::mat4(1),scaling);
+
+			transform = parentTransform*(t*r*s);
+		}else
+		{
+			glm::mat4 localTs = glm::make_mat4(node.matrix.data());
+			transform = parentTransform*localTs;
+		}
+
+		if(node.mesh != -1)
+		{
+			if(node.extras.Has("arealight"))
+			{
+				out_nodes.push_back(Node::CreateNode(node.name,transform,node.mesh + modelIdx,false));
+				// todo 还是看不懂
+				glm::vec4 local_p0 = glm::vec4(-1,0,-1,1);
+				glm::vec4 local_p1 = glm::vec4(-1,0,1,1);
+				glm::vec4 local_p3 = glm::vec4(1,0,-1,1);
+
+				LightObject light;
+				light.p0 = transform*local_p0;
+				light.p1 = transform*local_p1;
+				light.p3 = transform*local_p3;
+				glm::vec3 dir = glm::vec3(transform*glm::vec4(0,1,0,0));
+				light.normal_area = glm::vec4(glm::normalize(dir),0);
+                light.normal_area.w = glm::length(glm::cross(glm::vec3(light.p1 - light.p0), glm::vec3(light.p3 - light.p0))) / 2.0f;
+
+				out_lights.emplace_back(light);
+			}
+			else
+			{
+				out_nodes.empty(Node::CreateNode(node.name,transform,node.mesh + modelIdx,false));
+			}
+		}
+		else
+		{
+			if (node.camera > 0)
+			{
+				glm::vec4 camEye = transform*glm::vec4(0,0,0,1);
+				glm::vec4 camFwd = transform*glm::vec4(0,0,-1,0);
+                glm::mat4 ModelView = lookAt(glm::vec3(camEye), glm::vec3(camEye) + glm::vec3(camFwd.x, camFwd.y, camFwd.z), glm::vec3(0, 1, 0));
+
+				out_camera.cameras.emplace_back({std::to_string(node.camera) + "" + node.name,ModelView,40});
+
+				if(node.camera == 0)
+					out_camera.ModelView = ModelView;
+			}
+		}
+
+		for(auto child:node.children)
+		{
+		ParseGltfNode(out_nodes,out_camera,out_lights,transform,model,child,modelIdx);	
+		}
+		
+	}
+
+	void Model::LoadGLTFScene(const std::string& filename, Assets::CameraInitialSate& cameraInit, std::vector<Node>& nodes, std::vector<Assets::Model>& models, std::vector<Assets::Material>& materials, std::vector<Assets::LightObject>& lights)
+	{
+		// todo 感觉需要学习一下gltf里面的scene都包含什么东西，数据格式解析
+		int32_t materialIdx = static_cast<int32_t>(materials.size());
+		int32_t modelIdx = static_cast<uint32_t>(models.size());
+
+		tinygltf::Model model;
+		tinygltf::TinyGLTF gitfLoader;
+		std::string err;
+		std::string warn;
+
+		if(!gitfLoader.LoadBinaryFromFile(&model,&err,&warn,filename))
+		{
+			return;;
+		}
+
+		// load all texture
+		std::vector<uint32_t> textureIdMap;
+		std::filesystem::path filepath = filename;
+
+		for(uint32_t i = 0;i < model.images.size();i++)
+		{
+			tinygltf::Image& image = model.images[i];
+
+			std::string texname = image.name.empty() ? fmt::format("tex_{}",i) : image.name;
+			// todo globaltexturepoo; 的相关代码还没有观察过
+			uint32_t texIdx = GlobalTexturePool::LoadTexture(filepath.filename().string() + "_" + texname,
+				model.buffers[0].data.data() + model.bufferViews[image.bufferView].byteOffset,
+				model.bufferViews[image.bufferView].byteLength,Vulkan::SamplerConfig());
+
+			textureIdMap.push_back(texIdx);
+		}
+
+		// load all materials
+		for(tinygltf::Material& mat :model.materials)
+		{
+			Material m{};
+
+			m.DiffuseTextureId = -1;
+			m.MRATextureId = -1;
+			m.NormalTextureId = -1;
+
+			m.MaterialModel = Material::Enum::Mixture;
+			m.Fuzziness = static_cast<float>(mat.pbrMetallicRoughness.roughnessFactor);
+			m.Metalness = static_cast<float>(mat.pbrMetallicRoughness.metallicFactor);
+			m.RefractionIndex = 1.46f;
+			m.RefractionIndex2 = 1.46f;
+			
+			int texture = mat.pbrMetallicRoughness.baseColorTexture.index;
+			if(texture != -1)
+			{
+				m.DiffuseTextureId = textureIdMap[model.textures[texture].source];
+			}
+			int mraTexture = mat.pbrMetallicRoughness.metallicRoughnessTexture.index;
+			if(mraTexture != -1)
+			{
+				m.MRATextureId = textureIdMap[model.textures[mraTexture].source];
+				m.Fuzziness = 1.0;
+			}
+
+			glm::vec3 emissiveColor = mat.emissiveFactor.empty()
+										  ? glm::vec3(0)
+										  : glm::vec3(mat.emissiveFactor[0], mat.emissiveFactor[1],
+													  mat.emissiveFactor[2]);
+			glm::vec3 diffuseColor = mat.pbrMetallicRoughness.baseColorFactor.empty()
+										 ? glm::vec3(1)
+										 : glm::vec3(mat.pbrMetallicRoughness.baseColorFactor[0],
+													 mat.pbrMetallicRoughness.baseColorFactor[1],
+													 mat.pbrMetallicRoughness.baseColorFactor[2]);
+
+			m.Diffuse = glm::vec4(sqrt(diffuseColor),1.0);
+			
+			if(m.Metalness > 0.95)
+			{
+				m.MaterialModel = Material::Enum::Metallic;
+			}
+			if (m.Fuzziness > .95 && m.MRATextureId == -1)
+			{
+				m.MaterialModel = Material::Enum::Lambertian;
+			}
+
+
+			auto ior = mat.extensions.find("KHR_materials_ior");
+			if( ior != mat.extensions.end())
+			{
+				m.RefractionIndex = static_cast<float>(ior->second.Get("ior").GetNumberAsDouble());
+				m.RefractionIndex2 = m.RefractionIndex;
+			}
+			// todo 有一说一真的没有这么看懂这里在干什么
+
+			auto transmission = mat.extensions.find("KHR_materials_transmission");
+			if( transmission != mat.extensions.end())
+			{
+				float trans = static_cast<float>(transmission->second.Get("transmissionFactor").GetNumberAsDouble());
+				if(trans > 0.8)
+				{
+					m.MaterialModel = Material::Enum::Dielectric;
+				}
+			}
+
+			if( mat.extras.Has("ior2") )
+			{
+				m.RefractionIndex2 = mat.extras.Get("ior2").GetNumberAsDouble();
+			}
+
+			auto emissive = mat.extensions.find("KHR_materials_emissive_strength");
+			if (emissive != mat.extensions.end())
+			{
+				float power = static_cast<float>(emissive->second.Get("emissiveStrength").GetNumberAsDouble());
+				m = Material::DiffuseLight(emissiveColor * power * 100.0f);
+			}
+
+			materials.push_back(m);
+		}
+
+        // export whole scene into a big buffer, with vertice indices materials
+        int counter = 0;
+        for (tinygltf::Mesh& mesh : model.meshes)
+        {
+            std::vector<Vertex> vertices;
+            std::vector<uint32_t> indices;
+            std::vector<uint32_t> materials;
+
+            uint32_t vertext_offset = 0;
+            for (tinygltf::Primitive& primtive : mesh.primitives)
+            {
+                tinygltf::Accessor indexAccessor = model.accessors[primtive.indices];
+                if( primtive.mode != TINYGLTF_MODE_TRIANGLES || indexAccessor.count == 0)
+                {
+                    continue;
+                }
+               
+                tinygltf::Accessor positionAccessor = model.accessors[primtive.attributes["POSITION"]];
+                tinygltf::Accessor normalAccessor = model.accessors[primtive.attributes["NORMAL"]];
+                tinygltf::Accessor texcoordAccessor = model.accessors[primtive.attributes["TEXCOORD_0"]];
+
+                tinygltf::BufferView positionView = model.bufferViews[positionAccessor.bufferView];
+                tinygltf::BufferView normalView = model.bufferViews[normalAccessor.bufferView];
+                tinygltf::BufferView texcoordView = model.bufferViews[texcoordAccessor.bufferView];
+
+                int positionStride = positionAccessor.ByteStride(positionView);
+                int normalStride = normalAccessor.ByteStride(normalView);
+                int texcoordStride = texcoordAccessor.ByteStride(texcoordView);
+
+                for (size_t i = 0; i < positionAccessor.count; ++i)
+                {
+                    Vertex vertex;
+                    float* position = reinterpret_cast<float*>(&model.buffers[positionView.buffer].data[positionView.byteOffset + positionAccessor.byteOffset + i *
+                        positionStride]);
+                    vertex.Position = vec3(
+                        position[0],
+                        position[1],
+                        position[2]
+                    );
+                    float* normal = reinterpret_cast<float*>(&model.buffers[normalView.buffer].data[normalView.byteOffset + normalAccessor.byteOffset + i *
+                        normalStride]);
+                    vertex.Normal = vec3(
+                        normal[0],
+                        normal[1],
+                        normal[2]
+                    );
+
+                    if(texcoordView.byteOffset + i *
+                        texcoordStride < model.buffers[texcoordView.buffer].data.size())
+                    {
+                        float* texcoord = reinterpret_cast<float*>(&model.buffers[texcoordView.buffer].data[texcoordView.byteOffset + texcoordAccessor.byteOffset + i *
+                  texcoordStride]);
+                        vertex.TexCoord = vec2(
+                            texcoord[0],
+                            texcoord[1]
+                        );              
+                    }
+
+
+                    vertex.MaterialIndex = max(0, primtive.material) + matieralIdx;
+                    vertices.push_back(vertex);
+                }
+
+                materials.push_back(max(0, primtive.material) + matieralIdx);
+                tinygltf::BufferView indexView = model.bufferViews[indexAccessor.bufferView];
+                int strideIndex = indexAccessor.ByteStride(indexView);
+                for (size_t i = 0; i < indexAccessor.count; ++i)
+                {
+                    if( indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT )
+                    {
+                        uint16* data = reinterpret_cast<uint16*>(&model.buffers[indexView.buffer].data[indexView.byteOffset + indexAccessor.byteOffset + i * strideIndex]);
+                        indices.push_back(*data + vertext_offset);
+                    }
+                    else if( indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT )
+                    {
+                        uint32* data = reinterpret_cast<uint32*>(&model.buffers[indexView.buffer].data[indexView.byteOffset + indexAccessor.byteOffset + i * strideIndex]);
+                        indices.push_back(*data + vertext_offset);
+                    }
+                    else if( indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_INT )
+                    {
+                        int32* data = reinterpret_cast<int32*>(&model.buffers[indexView.buffer].data[indexView.byteOffset + indexAccessor.byteOffset + i * strideIndex]);
+                        indices.push_back(*data + vertext_offset);
+                    }
+                    else
+                    {
+                        assert(0);
+                    }
+                }
+
+                vertext_offset += static_cast<uint32_t>(positionAccessor.count);
+            }
+
+            #if FLATTEN_VERTICE
+                FlattenVertices(vertices, indices);
+            #endif
+            
+            models.push_back(Assets::Model(std::move(vertices), std::move(indices), std::move(materials), nullptr));
+        }
+
+        // default auto camera
+		Model::AutoFocusCamera(cameraInit, models);
+		cameraInit.FieldOfView = 20;
+		cameraInit.Aperture = 0.0f;
+		cameraInit.FocusDistance = 1000.0f;
+		cameraInit.ControlSpeed = 5.0f;
+		cameraInit.GammaCorrection = true;
+		cameraInit.HasSky = true;
+		cameraInit.HasSun = false;
+		cameraInit.SkyIdx = 0;
+
+		auto& root = model.scenes[0];
+		if(root.extras.Has("SkyIdx"))
+		{
+			cameraInit.HasSky = true;
+			cameraInit.SkyIdx = root.extras.Get("SkyIdx").GetNumberAsInt();
+		}
+		if(root.extras.Has("CamSpeed"))
+		{
+			cameraInit.ControlSpeed = static_cast<float>(root.extras.Get("CamSpeed").GetNumberAsDouble());
+		}
+		if(root.extras.Has("WithSun"))
+		{
+			cameraInit.HasSun = root.extras.Get("WithSun").GetNumberAsInt() != 0;
+		}
+		if(root.extras.Has("SunRotation"))
+		{
+			cameraInit.SunRotation = static_cast<float>(root.extras.Get("SunRotation").GetNumberAsDouble());
+		}  
+		for (int nodeIdx : model.scenes[0].nodes)
+		{
+			ParseGltfNode(nodes, cameraInit, lights, glm::mat4(1), model, nodeIdx, modelIdx);
+		}
+
+		// if we got camera in the scene
+		int i = 0;
+		for (tinygltf::Camera& cam : model.cameras)
+		{
+			cameraInit.cameras[i].Aperture = 0.0f;
+			cameraInit.cameras[i].FocalDistance = 1000.0f;
+			cameraInit.cameras[i].FieldOfView = static_cast<float>(cam.perspective.yfov) * 180.f / M_PI;
+            
+			if( cam.extras.Has("F-Stop") )
+			{
+				cameraInit.cameras[i].Aperture = 0.2f / cam.extras.Get("F-Stop").GetNumberAsDouble();
+			}
+			if( cam.extras.Has("FocalDistance") )
+			{
+				cameraInit.cameras[i].FocalDistance = cam.extras.Get("FocalDistance").GetNumberAsDouble();
+			}
+            
+			if (i == 0) //use 1st camera params
+			{
+				cameraInit.FieldOfView = cameraInit.cameras[i].FieldOfView;
+				cameraInit.Aperture = cameraInit.cameras[i].Aperture;
+				cameraInit.FocusDistance = cameraInit.cameras[i].FocalDistance;
+				cameraInit.CameraIdx = 0;
+
+			}
+			i++;
+		}		
+	}
+
+	void Model::FlattenVertices(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices)
+	{
+		if(GOption->RendererType == 1 || GOption->RendererType == 4) {
+			std::vector<Vertex> vertices_flatten;
+			std::vector<uint32_t> indices_flatten;
+
+			uint32_t idx_counter = 0;
+			for (uint32_t index : indices)
+			{
+				if (index < 0 || index > vertices.size() - 1) continue; //fix "out of range index" error
+
+				vertices_flatten.push_back(vertices[index]);
+				indices_flatten.push_back(idx_counter++);
+			}
+
+			vertices = std::move(vertices_flatten);
+			indices = std::move(indices_flatten);
+		}
+	}
+
+	void Model::AutoFocusCamera(Assets::CameraInitialSate& cameraInit, std::vector<Model>& models)
+	{
+		glm::vec3 boundsMin,boundsMax;
+		for(int i = 0;i < models.size();i++)
+		{
+			auto& model = models[i];
+			glm::vec3 min = model.GetLocalAABBMin();
+			glm::vec3 max = model.GetLocalAABBMax();
+			if(i == 0)
+			{
+				boundsMin = min;
+				boundsMax = max;
+			}
+			else
+			{
+				boundsMin = glm::min(boundsMin,min);
+				boundsMax = glm::max(boundsMax,max);
+			}
+		}
+
+		glm::vec3 boundsCenter = (boundsMax - boundsMin)*0.5f + boundsMin;
+        cameraInit.ModelView = lookAt(glm::vec3(boundsCenter.x, boundsCenter.y, boundsCenter.z + glm::length(boundsMax - boundsMin)), boundsCenter, glm::vec3(0, 1, 0));
+	}
+
+	int Model::LoadObjModel(const std::string& filename, std::vector<Node>& nodes, std::vector<Model>& models, std::vector<Material>& materials, std::vector<LightObject>& lights, bool autoNode)
+	{
+		
+	}
+
+
+	int Model::CreateCornellBox(const float scale, std::vector<Model>& models, std::vector<Material>& materials, std::vector<LightObject>& lights)
+	{
+		
+	}
+
+
+	Model Model::CreateBox(const glm::vec3& p0, const glm::vec3& p1, int materialIdx)
+	{
+		
+	}
+
+	
+	int Model::CreateLightQuad(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3,
+								const glm::vec3& dir, const glm::vec3& lightColor,
+								std::vector<Model>& models,
+								std::vector<Material>& materials,
+								std::vector<LightObject>& lights)
+	{
+		materials.push_back(Material::DiffuseLight(lightColor));
+		int materialIdx = static_cast<int32_t>(materials.size()) - 1;
+        
+		std::vector<Vertex> vertices;
+		std::vector<uint32_t> indices;
+        
+		vertices.push_back(Vertex{p0, dir, vec2(0, 1), materialIdx});
+		vertices.push_back(Vertex{p1, dir, vec2(1, 1), materialIdx});
+		vertices.push_back(Vertex{p2, dir, vec2(1, 0), materialIdx});
+		vertices.push_back(Vertex{p3, dir, vec2(0, 0), materialIdx});
+
+		indices.push_back(0);
+		indices.push_back(1);
+		indices.push_back(2);
+
+		indices.push_back(0);
+		indices.push_back(2);
+		indices.push_back(3);
+        
+		LightObject light;
+		light.p0 = vec4(p0,1);
+		light.p1 = vec4(p1,1);
+		light.p3 = vec4(p3,1);
+		light.normal_area = vec4(dir, 0);
+		light.normal_area.w = glm::length(glm::cross(glm::vec3(light.p1 - light.p0), glm::vec3(light.p3 - light.p0))) / 2.0f;
+        
+		lights.push_back(light);
+
+#if FLATTEN_VERTICE
+		FlattenVertices(vertices, indices);
+#endif
+
+		std::vector<uint32_t> materialIds = {(uint32_t)materialIdx};
+        
+		models.push_back( Model(
+			std::move(vertices),
+			std::move(indices),
+			std::move(materialIds),
+			nullptr));
+
+		return static_cast<int32_t>(models.size()) - 1;
+	}
+
+
+	Model::Model(std::vector<Vertex>&& vertices, std::vector<uint32_t>&& indices, std::vector<uint32_t>&& materials,
+			 const class Procedural* procedural) :
+	vertices_(std::move(vertices)),
+	indices_(std::move(indices)),
+	materialIdx_(std::move(materials)),
+	procedural_(procedural)
+	{
+		// calculate local aabb
+		local_aabb_min = glm::vec3(999999, 999999, 999999);
+		local_aabb_max = glm::vec3(-999999, -999999, -999999);
+
+		for( const auto& vertex : vertices_ )
+		{
+			local_aabb_min = glm::min(local_aabb_min, vertex.Position);
+			local_aabb_max = glm::max(local_aabb_max, vertex.Position);
+		}
+	}
+
+	Node Node::CreateNode(std::string name, glm::mat4 transform, int id, bool procedural)
+	{
+		return Node(name, transform, id, procedural);
+	}
+
+	Node::Node(std::string name, glm::mat4 transform, int id, bool procedural): name_(name), transform_(transform), modelId_(id),
+															  procedural_(procedural)
+	{
+	}
+}
