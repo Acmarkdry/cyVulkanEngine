@@ -141,120 +141,121 @@ namespace Assets
 		
 	}
 
-	void Model::LoadGLTFScene(const std::string& filename, Assets::CameraInitialSate& cameraInit, std::vector<Node>& nodes, std::vector<Assets::Model>& models, std::vector<Assets::Material>& materials, std::vector<Assets::LightObject>& lights)
-	{
-		// todo 感觉需要学习一下gltf里面的scene都包含什么东西，数据格式解析
-		int32_t materialIdx = static_cast<int32_t>(materials.size());
-		int32_t modelIdx = static_cast<uint32_t>(models.size());
+    void Model::LoadGLTFScene(const std::string& filename, Assets::CameraInitialSate& cameraInit, std::vector<Assets::Node>& nodes,
+                              std::vector<Assets::Model>& models,
+                              std::vector<Assets::Material>& materials, std::vector<Assets::LightObject>& lights)
+    {
+        int32_t matieralIdx = static_cast<int32_t>(materials.size());
+        int32_t modelIdx = static_cast<int32_t>(models.size());
+        
+        tinygltf::Model model;
+        tinygltf::TinyGLTF gltfLoader;
+        std::string err;
+        std::string warn;
 
-		tinygltf::Model model;
-		tinygltf::TinyGLTF gitfLoader;
-		std::string err;
-		std::string warn;
+        if(!gltfLoader.LoadBinaryFromFile(&model, &err, &warn, filename) )
+        {
+            return;
+        }
 
-		if(!gitfLoader.LoadBinaryFromFile(&model,&err,&warn,filename))
-		{
-			return;;
-		}
+        // load all textures
+        std::vector<uint32_t> textureIdMap;
 
-		// load all texture
-		std::vector<uint32_t> textureIdMap;
-		std::filesystem::path filepath = filename;
+        std::filesystem::path filepath = filename;
+        
+        for ( uint32_t i = 0; i < model.images.size(); ++i )
+        {
+            tinygltf::Image& image = model.images[i];
+            
+            std::string texname = image.name.empty() ? fmt::format("tex_{}", i):  image.name;
+            // 假设，这里的image id和外面的textures id是一样的
+            uint32_t texIdx = GlobalTexturePool::LoadTexture(
+                filepath.filename().string() + "_" + texname, model.buffers[0].data.data() + model.bufferViews[image.bufferView].byteOffset,
+                model.bufferViews[image.bufferView].byteLength, Vulkan::SamplerConfig());
 
-		for(uint32_t i = 0;i < model.images.size();i++)
-		{
-			tinygltf::Image& image = model.images[i];
+            textureIdMap.push_back(texIdx);
+        }
 
-			std::string texname = image.name.empty() ? fmt::format("tex_{}",i) : image.name;
-			// todo globaltexturepoo; 的相关代码还没有观察过
-			uint32_t texIdx = GlobalTexturePool::LoadTexture(filepath.filename().string() + "_" + texname,
-				model.buffers[0].data.data() + model.bufferViews[image.bufferView].byteOffset,
-				model.bufferViews[image.bufferView].byteLength,Vulkan::SamplerConfig());
+        // load all materials
+        for (tinygltf::Material& mat : model.materials)
+        {
+            Material m{};
 
-			textureIdMap.push_back(texIdx);
-		}
+            m.DiffuseTextureId = -1;
+            m.MRATextureId = -1;
+            m.NormalTextureId = -1;
 
-		// load all materials
-		for(tinygltf::Material& mat :model.materials)
-		{
-			Material m{};
+            m.MaterialModel = Material::Enum::Mixture;
+            m.Fuzziness = static_cast<float>(mat.pbrMetallicRoughness.roughnessFactor);
+            m.Metalness = static_cast<float>(mat.pbrMetallicRoughness.metallicFactor);
+            m.RefractionIndex = 1.46f;
+            m.RefractionIndex2 = 1.46f;
+            
+            int texture = mat.pbrMetallicRoughness.baseColorTexture.index;
+            if(texture != -1)
+            {
+                m.DiffuseTextureId = textureIdMap[ model.textures[texture].source ];
+            }
+            int mraTexture = mat.pbrMetallicRoughness.metallicRoughnessTexture.index;
+            if(mraTexture != -1)
+            {
+                m.MRATextureId = textureIdMap[ model.textures[mraTexture].source ];
+                m.Fuzziness = 1.0;
+            }
+            
+            glm::vec3 emissiveColor = mat.emissiveFactor.empty()
+                                          ? glm::vec3(0)
+                                          : glm::vec3(mat.emissiveFactor[0], mat.emissiveFactor[1],
+                                                      mat.emissiveFactor[2]);
+            glm::vec3 diffuseColor = mat.pbrMetallicRoughness.baseColorFactor.empty()
+                                         ? glm::vec3(1)
+                                         : glm::vec3(mat.pbrMetallicRoughness.baseColorFactor[0],
+                                                     mat.pbrMetallicRoughness.baseColorFactor[1],
+                                                     mat.pbrMetallicRoughness.baseColorFactor[2]);
 
-			m.DiffuseTextureId = -1;
-			m.MRATextureId = -1;
-			m.NormalTextureId = -1;
+            m.Diffuse = glm::vec4(sqrt(diffuseColor), 1.0);
 
-			m.MaterialModel = Material::Enum::Mixture;
-			m.Fuzziness = static_cast<float>(mat.pbrMetallicRoughness.roughnessFactor);
-			m.Metalness = static_cast<float>(mat.pbrMetallicRoughness.metallicFactor);
-			m.RefractionIndex = 1.46f;
-			m.RefractionIndex2 = 1.46f;
-			
-			int texture = mat.pbrMetallicRoughness.baseColorTexture.index;
-			if(texture != -1)
-			{
-				m.DiffuseTextureId = textureIdMap[model.textures[texture].source];
-			}
-			int mraTexture = mat.pbrMetallicRoughness.metallicRoughnessTexture.index;
-			if(mraTexture != -1)
-			{
-				m.MRATextureId = textureIdMap[model.textures[mraTexture].source];
-				m.Fuzziness = 1.0;
-			}
+            if (m.Metalness > .95)
+            {
+                m.MaterialModel = Material::Enum::Metallic;
+            }
 
-			glm::vec3 emissiveColor = mat.emissiveFactor.empty()
-										  ? glm::vec3(0)
-										  : glm::vec3(mat.emissiveFactor[0], mat.emissiveFactor[1],
-													  mat.emissiveFactor[2]);
-			glm::vec3 diffuseColor = mat.pbrMetallicRoughness.baseColorFactor.empty()
-										 ? glm::vec3(1)
-										 : glm::vec3(mat.pbrMetallicRoughness.baseColorFactor[0],
-													 mat.pbrMetallicRoughness.baseColorFactor[1],
-													 mat.pbrMetallicRoughness.baseColorFactor[2]);
+            if (m.Fuzziness > .95 && m.MRATextureId == -1)
+            {
+                m.MaterialModel = Material::Enum::Lambertian;
+            }
 
-			m.Diffuse = glm::vec4(sqrt(diffuseColor),1.0);
-			
-			if(m.Metalness > 0.95)
-			{
-				m.MaterialModel = Material::Enum::Metallic;
-			}
-			if (m.Fuzziness > .95 && m.MRATextureId == -1)
-			{
-				m.MaterialModel = Material::Enum::Lambertian;
-			}
+            auto ior = mat.extensions.find("KHR_materials_ior");
+            if( ior != mat.extensions.end())
+            {
+                m.RefractionIndex = static_cast<float>(ior->second.Get("ior").GetNumberAsDouble());
+                m.RefractionIndex2 = m.RefractionIndex;
+            }
 
+            auto transmission = mat.extensions.find("KHR_materials_transmission");
+            if( transmission != mat.extensions.end())
+            {
+                float trans = static_cast<float>(transmission->second.Get("transmissionFactor").GetNumberAsDouble());
+                if(trans > 0.8)
+                {
+                   m.MaterialModel = Material::Enum::Dielectric;
+                }
+            }
 
-			auto ior = mat.extensions.find("KHR_materials_ior");
-			if( ior != mat.extensions.end())
-			{
-				m.RefractionIndex = static_cast<float>(ior->second.Get("ior").GetNumberAsDouble());
-				m.RefractionIndex2 = m.RefractionIndex;
-			}
-			// todo 有一说一真的没有这么看懂这里在干什么
+            if( mat.extras.Has("ior2") )
+            {
+                m.RefractionIndex2 = mat.extras.Get("ior2").GetNumberAsDouble();
+            }
 
-			auto transmission = mat.extensions.find("KHR_materials_transmission");
-			if( transmission != mat.extensions.end())
-			{
-				float trans = static_cast<float>(transmission->second.Get("transmissionFactor").GetNumberAsDouble());
-				if(trans > 0.8)
-				{
-					m.MaterialModel = Material::Enum::Dielectric;
-				}
-			}
+            auto emissive = mat.extensions.find("KHR_materials_emissive_strength");
+            if (emissive != mat.extensions.end())
+            {
+                float power = static_cast<float>(emissive->second.Get("emissiveStrength").GetNumberAsDouble());
+                m = Material::DiffuseLight(emissiveColor * power * 100.0f);
+            }
 
-			if( mat.extras.Has("ior2") )
-			{
-				m.RefractionIndex2 = mat.extras.Get("ior2").GetNumberAsDouble();
-			}
-
-			auto emissive = mat.extensions.find("KHR_materials_emissive_strength");
-			if (emissive != mat.extensions.end())
-			{
-				float power = static_cast<float>(emissive->second.Get("emissiveStrength").GetNumberAsDouble());
-				m = Material::DiffuseLight(emissiveColor * power * 100.0f);
-			}
-
-			materials.push_back(m);
-		}
+            materials.push_back(m);
+        }
 
         // export whole scene into a big buffer, with vertice indices materials
         int counter = 0;
@@ -356,67 +357,68 @@ namespace Assets
         }
 
         // default auto camera
-		Model::AutoFocusCamera(cameraInit, models);
-		cameraInit.FieldOfView = 20;
-		cameraInit.Aperture = 0.0f;
-		cameraInit.FocusDistance = 1000.0f;
-		cameraInit.ControlSpeed = 5.0f;
-		cameraInit.GammaCorrection = true;
-		cameraInit.HasSky = true;
-		cameraInit.HasSun = false;
-		cameraInit.SkyIdx = 0;
+        Model::AutoFocusCamera(cameraInit, models);
+        cameraInit.FieldOfView = 20;
+        cameraInit.Aperture = 0.0f;
+        cameraInit.FocusDistance = 1000.0f;
+        cameraInit.ControlSpeed = 5.0f;
+        cameraInit.GammaCorrection = true;
+        cameraInit.HasSky = true;
+        cameraInit.HasSun = false;
+        cameraInit.SkyIdx = 0;
 
-		auto& root = model.scenes[0];
-		if(root.extras.Has("SkyIdx"))
-		{
-			cameraInit.HasSky = true;
-			cameraInit.SkyIdx = root.extras.Get("SkyIdx").GetNumberAsInt();
-		}
-		if(root.extras.Has("CamSpeed"))
-		{
-			cameraInit.ControlSpeed = static_cast<float>(root.extras.Get("CamSpeed").GetNumberAsDouble());
-		}
-		if(root.extras.Has("WithSun"))
-		{
-			cameraInit.HasSun = root.extras.Get("WithSun").GetNumberAsInt() != 0;
-		}
-		if(root.extras.Has("SunRotation"))
-		{
-			cameraInit.SunRotation = static_cast<float>(root.extras.Get("SunRotation").GetNumberAsDouble());
-		}  
-		for (int nodeIdx : model.scenes[0].nodes)
-		{
-			ParseGltfNode(nodes, cameraInit, lights, glm::mat4(1), model, nodeIdx, modelIdx);
-		}
+        auto& root = model.scenes[0];
+        if(root.extras.Has("SkyIdx"))
+        {
+            cameraInit.HasSky = true;
+            cameraInit.SkyIdx = root.extras.Get("SkyIdx").GetNumberAsInt();
+        }
+        if(root.extras.Has("CamSpeed"))
+        {
+            cameraInit.ControlSpeed = static_cast<float>(root.extras.Get("CamSpeed").GetNumberAsDouble());
+        }
+        if(root.extras.Has("WithSun"))
+        {
+            cameraInit.HasSun = root.extras.Get("WithSun").GetNumberAsInt() != 0;
+        }
+        if(root.extras.Has("SunRotation"))
+        {
+            cameraInit.SunRotation = static_cast<float>(root.extras.Get("SunRotation").GetNumberAsDouble());
+        }  
+        for (int nodeIdx : model.scenes[0].nodes)
+        {
+            ParseGltfNode(nodes, cameraInit, lights, glm::mat4(1), model, nodeIdx, modelIdx);
+        }
 
-		// if we got camera in the scene
-		int i = 0;
-		for (tinygltf::Camera& cam : model.cameras)
-		{
-			cameraInit.cameras[i].Aperture = 0.0f;
-			cameraInit.cameras[i].FocalDistance = 1000.0f;
-			cameraInit.cameras[i].FieldOfView = static_cast<float>(cam.perspective.yfov) * 180.f / M_PI;
+        // if we got camera in the scene
+        int i = 0;
+        for (tinygltf::Camera& cam : model.cameras)
+        {
+            cameraInit.cameras[i].Aperture = 0.0f;
+            cameraInit.cameras[i].FocalDistance = 1000.0f;
+            cameraInit.cameras[i].FieldOfView = static_cast<float>(cam.perspective.yfov) * 180.f / M_PI;
             
-			if( cam.extras.Has("F-Stop") )
-			{
-				cameraInit.cameras[i].Aperture = 0.2f / cam.extras.Get("F-Stop").GetNumberAsDouble();
-			}
-			if( cam.extras.Has("FocalDistance") )
-			{
-				cameraInit.cameras[i].FocalDistance = cam.extras.Get("FocalDistance").GetNumberAsDouble();
-			}
+            if( cam.extras.Has("F-Stop") )
+            {
+                cameraInit.cameras[i].Aperture = 0.2f / cam.extras.Get("F-Stop").GetNumberAsDouble();
+            }
+            if( cam.extras.Has("FocalDistance") )
+            {
+                cameraInit.cameras[i].FocalDistance = cam.extras.Get("FocalDistance").GetNumberAsDouble();
+            }
             
-			if (i == 0) //use 1st camera params
-			{
-				cameraInit.FieldOfView = cameraInit.cameras[i].FieldOfView;
-				cameraInit.Aperture = cameraInit.cameras[i].Aperture;
-				cameraInit.FocusDistance = cameraInit.cameras[i].FocalDistance;
-				cameraInit.CameraIdx = 0;
+            if (i == 0) //use 1st camera params
+            {
+                cameraInit.FieldOfView = cameraInit.cameras[i].FieldOfView;
+                cameraInit.Aperture = cameraInit.cameras[i].Aperture;
+                cameraInit.FocusDistance = cameraInit.cameras[i].FocalDistance;
+                cameraInit.CameraIdx = 0;
 
-			}
-			i++;
-		}		
-	}
+            }
+            i++;
+        }
+        //printf("model.cameras: %d\n", i);
+    }
 
 	void Model::FlattenVertices(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices)
 	{
@@ -464,6 +466,17 @@ namespace Assets
 
 	int Model::LoadObjModel(const std::string& filename, std::vector<Node>& nodes, std::vector<Model>& models, std::vector<Material>& materials, std::vector<LightObject>& lights, bool autoNode)
 	{
+		int32_t materialIdxOffset = static_cast<int32_t>(materials.size());
+
+		fmt::print("- loading '{} ... \n",filename);
+
+		const auto timer = std::chrono::high_resolution_clock::now();
+		const std::string materialPath = std::filesystem::path(filename).parent_path().string();
+
+		tinyobj::ObjReader objReader;
+		std::vector<std::string> searchPaths;
+		searchPaths.push_back()
+		
 		
 	}
 

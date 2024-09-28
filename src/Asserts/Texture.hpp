@@ -3,6 +3,7 @@
 #include <unordered_map>
 
 #include "Vulkan/Device.hpp"
+#include "Vulkan/Sampler.hpp"
 
 namespace Vulkan
 {
