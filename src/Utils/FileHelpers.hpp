@@ -5,7 +5,7 @@
 #include <fstream>
 #include <random>
 
-namespace utilities
+namespace Utilities
 {
 	namespace FileHelper
 	{

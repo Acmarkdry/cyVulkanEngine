@@ -21,7 +21,7 @@ namespace Assets
 		~GlobalTexturePool();
 
 		VkDescriptorSetLayout Layout() const { return layout_; }
-		VkDescriptorSet DescriptorSet(uint32_t index) const { return descriptorSets_[index]; }
+		VkDescriptorSet DescriptorSet(uint32_t index) const { return descriptorsets_[index]; }
 
 		void BindTexture(uint32_t textureIdx, const TextureImage& textureImage);
 		uint32_t TryGetTexureIndex(const std::string& textureName) const;
