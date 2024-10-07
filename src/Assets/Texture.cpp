@@ -51,6 +51,7 @@ namespace Assets
 	GlobalTexturePool::GlobalTexturePool(const Vulkan::Device& device, Vulkan::CommandPool& command_pool, Vulkan::CommandPool& command_pool_mt):
 	device_(device),commandPool_(command_pool),mainThreadCommandPool_(command_pool_mt)
 	{
+		// bindless 相关资料：https://zhuanlan.zhihu.com/p/673509730
 		static const uint32_t k_bindless_texture_binding = 0;
 
 		static const uint32_t k_max_bindless_resources = device.DeviceProperties().limits.maxPerStageDescriptorSamplers;
