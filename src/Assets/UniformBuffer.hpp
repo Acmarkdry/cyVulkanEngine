@@ -46,5 +46,25 @@ namespace Assets
 		std::unique_ptr<Vulkan::Buffer> buffer_;
 		std::unique_ptr<Vulkan::DeviceMemory> memory_;
 	};
+
+	struct RayCastContext
+	{
+		glm::vec4 Origin;
+		glm::vec4 Direction;
+		float TMin;
+		float TMax;
+		float Reversed0;
+		float Reversed1;
+	};
+	
+	struct RayCastResult
+	{
+		glm::vec4 HitPoint;
+		glm::vec4 Normal;
+		float T;
+		uint32_t InstanceId;
+		uint32_t MaterialId;
+		uint32_t Hitted;
+	};
 	
 }

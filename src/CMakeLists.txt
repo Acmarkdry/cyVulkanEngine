@@ -11,6 +11,11 @@ set(src_files
     Options.cpp
     TaskCoordinator.cpp
     TaskCoordinator.hpp
+    Application.hpp
+    Application.cpp
+    UserSettings.hpp
+    ModelViewController.cpp
+    ModelViewController.hpp
 )
 
 source_group("Asserts" FILES ${src_files_assets})
