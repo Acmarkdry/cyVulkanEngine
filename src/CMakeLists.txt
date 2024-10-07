@@ -3,6 +3,7 @@ set(exe_name ${MAIN_PROJECT})
 file(GLOB src_files_assets Assets/*)
 file(GLOB src_files_vulkan Vulkan/*)
 file(GLOB src_files_utils Utils/*)
+file(GLOB src_files_rendermodel RenderModel/*)
 
 set(src_files
     main.cpp
@@ -16,13 +17,14 @@ source_group("Asserts" FILES ${src_files_assets})
 source_group("Vulkan" FILES ${src_files_vulkan})
 source_group("Main" FILES ${src_files})
 source_group("Utils" FILES ${src_files_utils})
-
+source_group("RenderModel" FILES ${src_files_rendermodel})
 
 add_executable(${exe_name}
     ${src_files_assets}
     ${src_files_vulkan}
     ${src_files_utils}
     ${src_files}
+    ${src_files_rendermodel}
 )
 
 # add_dependencies()

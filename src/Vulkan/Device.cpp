@@ -2,8 +2,8 @@
 #include "Enumerate.hpp"
 #include "Instance.hpp"
 #include "Surface.hpp"
-#include "Utilities/Exception.hpp"
-#include "Vulkan/RayTracing/DeviceProcedures.hpp"
+#include "Utils/Exception.hpp"
+#include "RenderModel/DeviceProcedures.hpp"
 #include <algorithm>
 #include <set>
 

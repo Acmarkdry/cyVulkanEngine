@@ -33,7 +33,7 @@ namespace Utilities
 		
 		if(value < s_value[s_valueSZ - 1])
 		{
-			return fmt::printf(" ");
+			return fmt::sprintf(" ");
 		}
 		if(value < 10001.f)
 		{

@@ -7,7 +7,7 @@
 #include "ImageView.hpp"
 #include "SingleTimeCommands.hpp"
 #include "Utils/Exception.hpp"
-#include "Vulkan/RayTracing/DeviceProcedures.hpp"
+#include "RenderModel/DeviceProcedures.hpp"
 
 namespace Vulkan {
     RenderImage::RenderImage(const Device& device,

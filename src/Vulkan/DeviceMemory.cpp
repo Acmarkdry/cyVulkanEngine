@@ -1,6 +1,6 @@
 #include "DeviceMemory.hpp"
 #include "Device.hpp"
-#include "Utilities/Exception.hpp"
+#include "Utils/Exception.hpp"
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 #	include <aclapi.h>

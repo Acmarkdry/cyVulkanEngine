@@ -11,7 +11,7 @@
 #include "Assets/Scene.hpp"
 #include "Assets/UniformBuffer.hpp"
 #include "Assets/Vertex.hpp"
-#include "Utilities/FileHelper.hpp"
+#include "Utils/FileHelper.hpp"
 
 namespace Vulkan {
 

@@ -227,8 +227,8 @@ namespace Vulkan
 		virtual void OnTouch(bool down, double xpos, double ypos) {}
 		virtual void OnTouchMove(double xpos, double ypos) {}
 		virtual bool GetFocusDistance(float& distance) const {return false;}
-		virtual bool GetLastRaycastResult(Assets::RayCastResult& result) const {return false;}
-		virtual void SetRaycastRay(glm::vec3 org, glm::vec3 dir) const {};
+		// virtual bool GetLastRaycastResult(Assets::RayCastResult& result) const {return false;}
+		// virtual void SetRaycastRay(glm::vec3 org, glm::vec3 dir) const {};
 		
 		void CaptureScreenShot();
 		void CaptureEditorViewport(VkCommandBuffer commandBuffer, const uint32_t imageIndex);
