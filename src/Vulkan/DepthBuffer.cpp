@@ -4,7 +4,7 @@
 #include "DeviceMemory.hpp"
 #include "Image.hpp"
 #include "ImageView.hpp"
-#include "Utilities/Exception.hpp"
+#include "Utils/Exception.hpp"
 
 namespace Vulkan {
 

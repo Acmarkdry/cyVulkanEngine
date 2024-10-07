@@ -1,6 +1,6 @@
 set(exe_name ${MAIN_PROJECT})
 
-file(GLOB src_files_asserts Asserts/*)
+file(GLOB src_files_assets Assets/*)
 file(GLOB src_files_vulkan Vulkan/*)
 file(GLOB src_files_utils Utils/*)
 
@@ -12,14 +12,14 @@ set(src_files
     TaskCoordinator.hpp
 )
 
-source_group("Asserts" FILES ${src_files_asserts})
+source_group("Asserts" FILES ${src_files_assets})
 source_group("Vulkan" FILES ${src_files_vulkan})
 source_group("Main" FILES ${src_files})
 source_group("Utils" FILES ${src_files_utils})
 
 
 add_executable(${exe_name}
-    ${src_files_asserts}
+    ${src_files_assets}
     ${src_files_vulkan}
     ${src_files_utils}
     ${src_files}
