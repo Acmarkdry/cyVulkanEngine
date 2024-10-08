@@ -168,7 +168,6 @@ namespace Assets
 			ParseGltfNode(out_nodes, out_camera, out_lights, transform, model, child, modelIdx);
 		}
 	}
-	// 代码目前看到了这里
 
 	void Model::LoadGLTFScene(const std::string& filename, CameraInitialSate& cameraInit, std::vector<Node>& nodes,
 	                          std::vector<Model>& models,
@@ -255,7 +254,7 @@ namespace Assets
 				m.MaterialModel = Material::Enum::Lambertian;
 			}
 
-			auto ior = mat.extensions.find("KHR_materials_ior");
+			auto ior = mat.extensions.find("KHR_materials_ior");// 获取折射率
 			if (ior != mat.extensions.end())
 			{
 				m.RefractionIndex = static_cast<float>(ior->second.Get("ior").GetNumberAsDouble());
