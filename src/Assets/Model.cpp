@@ -491,8 +491,10 @@ namespace Assets
 			}
 			else
 			{
-				boundsMin = glm::min(AABBMin, boundsMin);
-				boundsMax = glm::max(AABBMax, boundsMax);
+				if(AABBMin < boundsMin)
+					boundsMin = AABBMin;
+				if(AABBMax > boundsMax)
+					boundsMax = AABBMax;
 			}
 		}
 

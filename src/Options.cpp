@@ -1,6 +1,6 @@
 #include "Options.hpp"
 #include "SceneList.hpp"
-#include "Utilities/Exception.hpp"
+#include "Utils/Exception.hpp"
 #include <boost/program_options.hpp>
 #include <iostream>
 

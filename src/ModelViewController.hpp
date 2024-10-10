@@ -1,21 +1,24 @@
 #pragma once
+
 #include "Utils/Glm.hpp"
 
-class ModelViewController
+class ModelViewController final
 {
 public:
+
 	void Reset(const glm::mat4& modelView);
 
 	glm::mat4 ModelView() const;
-	glm::vec4 Position() const{return position_;}
+	glm::vec4 Position() const { return position_; }
 
-	bool OnKey(int key,int scancode,int action,int mods);
-	bool OnCursorPosition(double x, double y);
+	bool OnKey(int key, int scancode, int action, int mods);
+	bool OnCursorPosition(double xpos, double ypos);
 	bool OnMouseButton(int button, int action, int mods);
-	bool OnTouch(bool down,double xpos,double ypos);
-	bool updateCamera(double speed,double timeDelta);
+	bool OnTouch(bool down, double xpos, double ypos);
+	bool UpdateCamera(double speed, double timeDelta);
 
 private:
+
 	void MoveForward(float d);
 	void MoveRight(float d);
 	void MoveUp(float d);

@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 #include <vector>
+#include "Assets/UniformBuffer.hpp"
+#include "Assets/Model.hpp"
 
 class UserSettings final
 {
@@ -58,7 +60,7 @@ public:
 	inline const static float FieldOfViewMinValue = 10.f;
 	inline const static float FieldOfViewMaxValue = 90.f;
 
-	std::vector<Asset::Camera> cameras;
+	std::vector<Assets::Camera> cameras;
 	//hitresult
 	Assets::RayCastResult HitResult;
 	

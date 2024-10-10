@@ -16,6 +16,8 @@ set(src_files
     UserSettings.hpp
     ModelViewController.cpp
     ModelViewController.hpp
+    SceneList.cpp
+    SceneList.hpp
 )
 
 source_group("Asserts" FILES ${src_files_assets})
