@@ -59,7 +59,9 @@ public:
 	float PaperWhiteNit;
 	inline const static float FieldOfViewMinValue = 10.f;
 	inline const static float FieldOfViewMaxValue = 90.f;
-
+	
+	uint32_t RR_MIN_DEPTH;
+	
 	std::vector<Assets::Camera> cameras;
 	//hitresult
 	Assets::RayCastResult HitResult;

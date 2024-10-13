@@ -475,15 +475,15 @@ namespace Assets
 		}
 	}
 
-	void Model::AutoFocusCamera(CameraInitialSate& cameraInit, std::vector<Model>& models)
+	void Model::AutoFocusCamera(Assets::CameraInitialSate& cameraInit, std::vector<Model>& models)
 	{
 		//auto center camera by scene bounds
-		vec3 boundsMin, boundsMax;
+		glm::vec3 boundsMin, boundsMax;
 		for (int i = 0; i < models.size(); i++)
 		{
 			auto& model = models[i];
-			vec3 AABBMin = model.GetLocalAABBMin();
-			vec3 AABBMax = model.GetLocalAABBMax();
+			glm::vec3 AABBMin = model.GetLocalAABBMin();
+			glm::vec3 AABBMax = model.GetLocalAABBMax();
 			if (i == 0)
 			{
 				boundsMin = AABBMin;
@@ -491,17 +491,13 @@ namespace Assets
 			}
 			else
 			{
-				if(AABBMin < boundsMin)
-					boundsMin = AABBMin;
-				if(AABBMax > boundsMax)
-					boundsMax = AABBMax;
+				boundsMin = glm::min(AABBMin, boundsMin);
+				boundsMax = glm::max(AABBMax, boundsMax);
 			}
 		}
 
-		vec3 boundsCenter = (boundsMax - boundsMin) * 0.5f + boundsMin;
-		cameraInit.ModelView = lookAt(
-			vec3(boundsCenter.x, boundsCenter.y, boundsCenter.z + length(boundsMax - boundsMin)), boundsCenter,
-			vec3(0, 1, 0));
+		glm::vec3 boundsCenter = (boundsMax - boundsMin) * 0.5f + boundsMin;
+		cameraInit.ModelView = lookAt(vec3(boundsCenter.x, boundsCenter.y, boundsCenter.z + glm::length(boundsMax - boundsMin)), boundsCenter, vec3(0, 1, 0));
 	}
 
 	int Model::LoadObjModel(const std::string& filename, std::vector<Node>& nodes, std::vector<Model>& models,
