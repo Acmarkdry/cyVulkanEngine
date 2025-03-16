@@ -4,7 +4,15 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 file(GLOB_RECURSE src_files_assets "Assets/*.cpp" "Assets/*.hpp")
 file(GLOB_RECURSE src_files_utilities "Utilities/*.cpp" "Utilities/*.hpp")
 file(GLOB_RECURSE src_files_vulkan "Vulkan/*.cpp" "Vulkan/*.hpp")
-
+file(GLOB_RECURSE src_files_thirdparty 
+	"ThirdParty/json11/*.cpp" 
+	"ThirdParty/json11/*.hpp" 
+	"ThirdParty/mikktspace/*.c" 
+	"ThirdParty/mikktspace/*.h"
+	"ThirdParty/miniaudio/*.h"
+	"ThirdParty/lzav/*.h"
+	"ThirdParty/tinybvh/*.h"
+	)
 if (MSVC)
 set_source_files_properties(
   ${src_files_thirdparty}
@@ -28,8 +36,8 @@ file(GLOB_RECURSE src_files_engine
 )
 file(GLOB_RECURSE src_files_editor "Editor/*")
 file(GLOB_RECURSE src_files_magicalego "MagicaLego/*.cpp" "MagicaLego/*.hpp")
-file(GLOB_RECURSE src_files_cyrenderer "Application/NextRenderer/*")
-file(GLOB_RECURSE src_files_cybenchmark "Application/NextBenchmark/*")
+file(GLOB_RECURSE src_files_cyrenderer "Application/cyNextRenderer/*")
+file(GLOB_RECURSE src_files_cybenchmark "Application/cyNextBenchmark/*")
 
 # libray and app
 if ( ANDROID )
@@ -57,11 +65,11 @@ add_executable(cyNextRenderer
 	${src_files_cyrenderer}
 	DesktopMain.cpp
 )
-add_executable(gkNextBenchmark
-	${src_files_gkbenchmark}
+add_executable(cyNextBenchmark
+	${src_files_cybenchmark}
 	DesktopMain.cpp
 )
-add_executable(gkNextEditor
+add_executable(cyNextEditor
 	${src_files_editor}
 	DesktopMain.cpp
 )
@@ -82,21 +90,20 @@ if (UNIX AND NOT APPLE AND NOT ANDROID)
 endif()
 
 # editor stuff
-# add_subdirectory(ThirdParty/ImNodeFlow)
-# add_subdirectory(ThirdParty/quickjs-ng)
-
+add_subdirectory(ThirdParty/ImNodeFlow)
+add_subdirectory(ThirdParty/quickjs-ng)
 # postprocess: target setup
 if ( ANDROID )
 set(AllTargets 
-gkNextEngine
-gkNextRenderer
+cyNextEngine
+cyNextRenderer
 )
 else()
 set(AllTargets 
-gkNextEngine
-gkNextRenderer
-gkNextBenchmark
-gkNextEditor
+cyNextEngine
+cyNextRenderer
+cyNextBenchmark
+cyNextEditor
 Packager
 MagicaLego 
 )
@@ -123,7 +130,7 @@ foreach(target IN LISTS AllTargets)
 	target_compile_definitions(${target} PRIVATE $<$<CONFIG:Debug>:JPH_DEBUG_RENDERER JPH_PROFILE_ENABLED>)
 	
 	# link engine
-	if ( ${target} STREQUAL gkNextEngine )
+	if ( ${target} STREQUAL cyNextEngine )
 		target_compile_definitions(${target} PRIVATE ENGINE_EXPORTS)
 		target_link_libraries(${target} PRIVATE cxxopts::cxxopts Jolt::Jolt quickjs KTX::ktx fmt::fmt CURL::libcurl glm::glm imgui::imgui tinyobjloader::tinyobjloader draco::draco ${Vulkan_LIBRARIES} ${extra_libs})
 		if ( NOT ANDROID ) 
@@ -131,7 +138,7 @@ foreach(target IN LISTS AllTargets)
 		endif()
 	else()
 		set_target_properties(${target} PROPERTIES FOLDER "Programs")
-		target_link_libraries(${target} PRIVATE gkNextEngine fmt::fmt )
+		target_link_libraries(${target} PRIVATE cyNextEngine fmt::fmt )
 	endif()
 
 	# for android
@@ -156,12 +163,12 @@ foreach(target IN LISTS AllTargets)
 		target_link_libraries(${target} PRIVATE SuperluminalAPI)
 	endif()
 
-	#if ( WITH_OIDN )
-	#	target_compile_definitions(${target} PUBLIC WITH_OIDN=1)
-	#	target_include_directories(${target} PRIVATE ../src/ThirdParty/oidn/include/)
-	#	target_link_directories(${target} PRIVATE ../src/ThirdParty/oidn/lib/)
-	#	target_link_libraries(${target} PRIVATE OpenImageDenoise OpenImageDenoise_core )
-	#endif()
+	if ( WITH_OIDN )
+		target_compile_definitions(${target} PUBLIC WITH_OIDN=1)
+		target_include_directories(${target} PRIVATE ../src/ThirdParty/oidn/include/)
+		target_link_directories(${target} PRIVATE ../src/ThirdParty/oidn/lib/)
+		target_link_libraries(${target} PRIVATE OpenImageDenoise OpenImageDenoise_core )
+	endif()
 
 	if( WIN32 )
 		target_compile_definitions(${target} PUBLIC VK_USE_PLATFORM_WIN32_KHR PLATFORM__WINDOWS)
@@ -185,18 +192,17 @@ foreach(target IN LISTS AllTargets)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -mavx")
 	endif()
 	if (MSVC)
-	
-	#add_custom_command(
-	#		TARGET ${target} POST_BUILD
-	#		COMMAND echo \"copy ffmpeg exe...\"
-	#		COMMAND xcopy \"${CMAKE_CURRENT_SOURCE_DIR}/../src/ThirdParty/ffmpeg/bin/ffmpeg.exe\" \"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}\" /Y /Q /F
-	#	)
+	add_custom_command(
+			TARGET ${target} POST_BUILD
+			COMMAND echo \"copy ffmpeg exe...\"
+			COMMAND xcopy \"${CMAKE_CURRENT_SOURCE_DIR}/../src/ThirdParty/ffmpeg/bin/ffmpeg.exe\" \"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}\" /Y /Q /F
+		)
 	endif()
 	endif()
 
-	#if ( ${target} STREQUAL gkNextEditor )
-	#target_link_libraries(gkNextEditor PRIVATE ImNodeFlow)
-	#set_target_properties(ImNodeFlow PROPERTIES FOLDER "ThirdParty")
+	if ( ${target} STREQUAL cyNextEditor )
+	target_link_libraries(cyNextEditor PRIVATE ImNodeFlow)
+	set_target_properties(ImNodeFlow PROPERTIES FOLDER "ThirdParty")
 	# third-party warning fix
 	if (MSVC)
 
@@ -207,6 +213,6 @@ foreach(target IN LISTS AllTargets)
 
 endforeach()
 
-# set_target_properties(quickjs PROPERTIES FOLDER "ThirdParty")
+set_target_properties(quickjs PROPERTIES FOLDER "ThirdParty")
 set_target_properties(Assets PROPERTIES FOLDER "Engine")
 set_target_properties(cyNextEngine PROPERTIES FOLDER "Engine")
