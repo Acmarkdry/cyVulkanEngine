@@ -1,0 +1,89 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_nonuniform_qualifier : require
+
+#include "Platform.glsl"
+#include "common/Material.glsl"
+#include "common/UniformBufferObject.glsl"
+#include "common/Random.glsl"
+
+layout(binding = 0, rg32ui) uniform uimage2D MiniGBuffer;
+layout(binding = 1, rgba8) uniform image2D OutImage;
+layout(binding = 2) readonly uniform UniformBufferObjectStruct { UniformBufferObject Camera; };
+
+layout(binding = 4) readonly buffer VertexArray { float Vertices[]; };
+layout(binding = 5) readonly buffer IndexArray { uint Indices[]; };
+layout(binding = 6) readonly buffer MaterialArray { Material[] Materials; };
+layout(binding = 7) readonly buffer OffsetArray { uvec2[] Offsets; };
+layout(binding = 8) readonly buffer NodeProxyArray { NodeProxy[] NodeProxies; };
+layout(binding = 9, rg16f) uniform image2D OutMotionVector;
+
+layout(set = 1, binding = 0) uniform sampler2D GlobalTextureSamplers[];
+
+#include "common/Vertex.glsl"
+#include "common/ColorFunc.glsl"
+
+#if DESKTOP
+layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
+#else
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+#endif
+
+#include "common/VertexFunc.glsl"
+
+void main() {
+
+    // checker box
+    int adder = Camera.TotalFrames % 2 == 0 ? 1 : 0;
+    
+    ivec2 ipos = ivec2(gl_GlobalInvocationID.xy);
+    if(Camera.UseCheckerBoard)
+    {
+        ipos = ipos * ivec2(2,1);
+        if((gl_GlobalInvocationID.y + adder) % 2 == 0) {
+            ipos.x += 1;
+        }
+    }
+	
+	ivec2 size = imageSize(MiniGBuffer);
+    uvec2 vBuffer = imageLoad(MiniGBuffer, ipos).rg;
+    vec2 uv = vec2(ipos) / vec2(size) * 2.0 - 1.0;
+    vec4 origin = Camera.ModelViewInverse * vec4(0, 0, 0, 1);
+	vec4 target = Camera.ProjectionInverse * (vec4(uv.x, uv.y, 1, 1));
+	vec4 dir = Camera.ModelViewInverse * vec4(normalize(target.xyz), 0);
+	
+	vec3 ray_dir = normalize(dir.xyz);
+    
+    Vertex v = get_material_data(ipos, vBuffer, origin.xyz, ray_dir);
+    
+    NodeProxy node = NodeProxies[vBuffer.x - 1];
+    Material mat = Materials[node.matId[v.MaterialIndex]];
+    
+    vec4 albedo = mat.Diffuse;
+    if (mat.DiffuseTextureId >= 0)
+    {
+        vec4 tex = texture(GlobalTextureSamplers[mat.DiffuseTextureId], v.TexCoord);
+        albedo *= tex * tex;
+    }
+	
+	vec3 normal = normalize( v.Normal.rgb);
+	// ibl
+	const float dotValue = dot(ray_dir, normal);
+	const vec3 outwardNormal = dotValue > 0 ? -normal : normal;
+	const float cosine = dotValue > 0 ? mat.RefractionIndex * dotValue : -dotValue;
+	const float reflectProb = Schlick(cosine, mat.RefractionIndex);
+	const float metalProb = mat.Metalness;
+	
+	vec3 skyColor = vec3(1);
+	
+	const float t = 0.5*(v.Normal.y + 1);
+	skyColor = mix(vec3(1.0), vec3(0.5, 0.7, 1.0) * 20, t);
+	
+	const vec3 lightVector = Camera.SunDirection.xyz;
+    const float d = max(dot(lightVector, normalize(v.Normal.rgb)) * 30.0, 0.5);
+    
+    vec4 outColor = albedo * d + albedo * vec4(skyColor,1);
+
+	outColor.rgb = LinearToST2084UE(outColor.rgb * Camera.PaperWhiteNit / 230.0);
+    imageStore(OutImage, ipos, outColor);
+}

@@ -1,57 +1,212 @@
-set(exe_name ${MAIN_PROJECT})
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-file(GLOB src_files_assets Assets/*)
-file(GLOB src_files_vulkan Vulkan/*)
-file(GLOB src_files_utils Utils/*)
-file(GLOB src_files_rendermodel RenderModel/*)
+# directory naming
+file(GLOB_RECURSE src_files_assets "Assets/*.cpp" "Assets/*.hpp")
+file(GLOB_RECURSE src_files_utilities "Utilities/*.cpp" "Utilities/*.hpp")
+file(GLOB_RECURSE src_files_vulkan "Vulkan/*.cpp" "Vulkan/*.hpp")
 
-set(src_files
-    main.cpp
-    Options.hpp
-    Options.cpp
-    TaskCoordinator.cpp
-    TaskCoordinator.hpp
-    Application.hpp
-    Application.cpp
-    UserSettings.hpp
-    ModelViewController.cpp
-    ModelViewController.hpp
-    SceneList.cpp
-    SceneList.hpp
-)
-
-source_group("Asserts" FILES ${src_files_assets})
-source_group("Vulkan" FILES ${src_files_vulkan})
-source_group("Main" FILES ${src_files})
-source_group("Utils" FILES ${src_files_utils})
-source_group("RenderModel" FILES ${src_files_rendermodel})
-
-add_executable(${exe_name}
-    ${src_files_assets}
-    ${src_files_vulkan}
-    ${src_files_utils}
-    ${src_files}
-    ${src_files_rendermodel}
-)
-
-# add_dependencies()
-
-set_target_properties(${exe_name} PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
-target_include_directories(${exe_name} PRIVATE . ${STB_INCLUDE_DIRS} ${Vulkan_INCLUDE_DIRS})
-target_include_directories(${exe_name} PRIVATE ${TINYGLTF_INCLUDE_DIRS})
-target_include_directories(${exe_name} PRIVATE ${CPP_BASE64_INCLUDE_DIRS})
-
-# 编译后命令
-# add_custom_command(
-#             TARGET ${exe_name} POST_BUILD
-# 			COMMAND echo \"copy oidn dlls...\"
-#             COMMAND xcopy \"${CMAKE_CURRENT_SOURCE_DIR}/../src/ThirdParty/oidn/bin/*.dll\" \"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}\" /Y /Q /F
-#         )
-# endif()
-
-target_link_libraries(${exe_name} PRIVATE fmt::fmt CURL::libcurl Boost::boost Boost::exception Boost::program_options glm::glm imgui::imgui tinyobjloader::tinyobjloader draco::draco ${Vulkan_LIBRARIES} ${extra_libs})
-target_link_libraries(${exe_name} PRIVATE glfw)
-
-if(WIN32)
-target_compile_definitions(${exe_name} PUBLIC VK_USE_PLATFORM_WIN32_KHR PLATFORM_WINDOWS)
+if (MSVC)
+set_source_files_properties(
+  ${src_files_thirdparty}
+  PROPERTIES
+  COMPILE_FLAGS "/W0"
+) 
+else()
+set_source_files_properties(
+  ${src_files_thirdparty}
+  PROPERTIES
+  COMPILE_FLAGS "-w"
+) 
 endif()
+file(GLOB_RECURSE src_files_engine
+	"Common/*.hpp" 
+	"Runtime/*.h"
+	"Runtime/*.hpp"
+	"Runtime/*.cpp"
+	"Options.cpp"
+	"Options.hpp"
+)
+file(GLOB_RECURSE src_files_editor "Editor/*")
+file(GLOB_RECURSE src_files_magicalego "MagicaLego/*.cpp" "MagicaLego/*.hpp")
+file(GLOB_RECURSE src_files_cyrenderer "Application/NextRenderer/*")
+file(GLOB_RECURSE src_files_cybenchmark "Application/NextBenchmark/*")
+
+# libray and app
+if ( ANDROID )
+add_library(cyNextEngine
+	${src_files_assets} 
+	${src_files_utilities} 
+	${src_files_engine}
+	${src_files_vulkan} 
+	${src_files_thirdparty}
+)
+add_library(cyNextRenderer SHARED
+	${src_files_cyrenderer}
+	AndroidMain.cpp
+	GameActivitySources.cpp
+)
+else()
+add_library(cyNextEngine
+	${src_files_assets} 
+	${src_files_utilities} 
+	${src_files_engine}
+	${src_files_vulkan} 
+	${src_files_thirdparty}
+)
+add_executable(cyNextRenderer
+	${src_files_cyrenderer}
+	DesktopMain.cpp
+)
+add_executable(gkNextBenchmark
+	${src_files_gkbenchmark}
+	DesktopMain.cpp
+)
+add_executable(gkNextEditor
+	${src_files_editor}
+	DesktopMain.cpp
+)
+add_executable(MagicaLego
+	${src_files_magicalego}
+	DesktopMain.cpp
+)
+add_executable(Packager
+	${src_files_utilities} 
+	Packager/PackagerMain.cpp
+)
+endif()
+
+if (UNIX AND NOT APPLE AND NOT ANDROID)
+	# GCC8 needs an extra lib for <filesystem>.
+	# This is not needed with GCC9 or higher.
+	set(extra_libs -lstdc++fs ${Backtrace_LIBRARIES})
+endif()
+
+# editor stuff
+# add_subdirectory(ThirdParty/ImNodeFlow)
+# add_subdirectory(ThirdParty/quickjs-ng)
+
+# postprocess: target setup
+if ( ANDROID )
+set(AllTargets 
+gkNextEngine
+gkNextRenderer
+)
+else()
+set(AllTargets 
+gkNextEngine
+gkNextRenderer
+gkNextBenchmark
+gkNextEditor
+Packager
+MagicaLego 
+)
+endif()
+
+# common setup
+foreach(target IN LISTS AllTargets)
+	# common dependencies
+	add_dependencies(${target} Assets)
+	set_target_properties(${target} PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
+
+	# include paths
+	target_include_directories(${target} PRIVATE .)
+	target_include_directories(${target} PRIVATE ${STB_INCLUDE_DIRS})
+	target_include_directories(${target} PRIVATE ${Vulkan_INCLUDE_DIRS})
+	target_include_directories(${target} PRIVATE ${TINYGLTF_INCLUDE_DIRS})
+	target_include_directories(${target} PRIVATE ${CPP_BASE64_INCLUDE_DIRS})
+
+	# preprocessor definitions
+	target_compile_definitions(${target} PUBLIC IMGUI_DEFINE_MATH_OPERATORS)
+	target_compile_definitions(${target} PUBLIC MA_NO_ENCODING MA_NO_FLAC)
+	# if debug
+	# 假设你的目标名称是 MyTarget
+	target_compile_definitions(${target} PRIVATE $<$<CONFIG:Debug>:JPH_DEBUG_RENDERER JPH_PROFILE_ENABLED>)
+	
+	# link engine
+	if ( ${target} STREQUAL gkNextEngine )
+		target_compile_definitions(${target} PRIVATE ENGINE_EXPORTS)
+		target_link_libraries(${target} PRIVATE cxxopts::cxxopts Jolt::Jolt quickjs KTX::ktx fmt::fmt CURL::libcurl glm::glm imgui::imgui tinyobjloader::tinyobjloader draco::draco ${Vulkan_LIBRARIES} ${extra_libs})
+		if ( NOT ANDROID ) 
+		target_link_libraries(${target} PRIVATE glfw)
+		endif()
+	else()
+		set_target_properties(${target} PROPERTIES FOLDER "Programs")
+		target_link_libraries(${target} PRIVATE gkNextEngine fmt::fmt )
+	endif()
+
+	# for android
+	if ( ANDROID)
+		target_include_directories(${target} PRIVATE ${ANDROID_NDK}/sources/android/native_app_glue)
+		target_link_libraries(${target} PRIVATE game-activity::game-activity log android)
+	endif()
+
+	if (CMAKE_CXX_COMPILER MATCHES ".*mingw.*")
+		target_link_libraries(${target} PRIVATE gdi32)
+	endif()
+
+	if ( WITH_AVIF )
+		target_compile_definitions(${target} PUBLIC WITH_AVIF=1)
+		target_compile_definitions(${target} PUBLIC AVIF_CODEC_AOM=SYSTEM)
+		target_link_libraries(${target} PRIVATE avif)
+	endif()
+
+	if( WITH_SUPERLUMINAL )
+		target_compile_definitions(${target} PUBLIC WITH_SUPERLUMINAL=1)
+		target_include_directories(${target} SYSTEM PRIVATE ${SuperluminalAPI_INCLUDE_DIRS})
+		target_link_libraries(${target} PRIVATE SuperluminalAPI)
+	endif()
+
+	#if ( WITH_OIDN )
+	#	target_compile_definitions(${target} PUBLIC WITH_OIDN=1)
+	#	target_include_directories(${target} PRIVATE ../src/ThirdParty/oidn/include/)
+	#	target_link_directories(${target} PRIVATE ../src/ThirdParty/oidn/lib/)
+	#	target_link_libraries(${target} PRIVATE OpenImageDenoise OpenImageDenoise_core )
+	#endif()
+
+	if( WIN32 )
+		target_compile_definitions(${target} PUBLIC VK_USE_PLATFORM_WIN32_KHR PLATFORM__WINDOWS)
+	endif()	
+
+	# warning as error
+	if (MSVC)
+		target_compile_options(${target} PRIVATE /WX)
+		target_compile_options(${target} PRIVATE /wd4200)
+	else()
+	target_compile_options(${target} PRIVATE -Wall -Werror -Wno-unused-but-set-variable -Wno-inconsistent-missing-override -Wno-unused-const-variable -Wno-unused-variable -Wno-unused-private-field -Wno-unused-function -Wno-sign-compare -Wno-unused-result)
+		if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+			target_compile_options(${target} PRIVATE -Wno-stringop-overflow)
+		endif()
+	endif()
+
+	# specific for targets
+	if ( ${target} STREQUAL MagicaLego )
+	if (UNIX AND NOT APPLE)
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -mavx")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -mavx")
+	endif()
+	if (MSVC)
+	
+	#add_custom_command(
+	#		TARGET ${target} POST_BUILD
+	#		COMMAND echo \"copy ffmpeg exe...\"
+	#		COMMAND xcopy \"${CMAKE_CURRENT_SOURCE_DIR}/../src/ThirdParty/ffmpeg/bin/ffmpeg.exe\" \"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}\" /Y /Q /F
+	#	)
+	endif()
+	endif()
+
+	#if ( ${target} STREQUAL gkNextEditor )
+	#target_link_libraries(gkNextEditor PRIVATE ImNodeFlow)
+	#set_target_properties(ImNodeFlow PROPERTIES FOLDER "ThirdParty")
+	# third-party warning fix
+	if (MSVC)
+
+	else()
+	set_source_files_properties(${src_files_editor} PROPERTIES COMPILE_FLAGS "-w")
+	endif()
+	endif()
+
+endforeach()
+
+# set_target_properties(quickjs PROPERTIES FOLDER "ThirdParty")
+set_target_properties(Assets PROPERTIES FOLDER "Engine")
+set_target_properties(cyNextEngine PROPERTIES FOLDER "Engine")
