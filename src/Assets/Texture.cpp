@@ -1,6 +1,6 @@
 #include "Texture.hpp"
-#include "Utils/StbImage.hpp"
-#include "Utils/Exception.hpp"
+#include "Utilities/StbImage.hpp"
+#include "Utilities/Exception.hpp"
 #include <chrono>
 #include <imgui_impl_vulkan.h>
 #include <fmt/format.h>
@@ -10,8 +10,8 @@
 #include "Options.hpp"
 #include "Runtime/TaskCoordinator.hpp"
 #include "TextureImage.hpp"
-#include "Utils/Console.hpp"
-#include "Utils/FileHelper.hpp"
+#include "Utilities/Console.hpp"
+#include "Utilities/FileHelper.hpp"
 #include "Vulkan/Device.hpp"
 #include "Vulkan/ImageView.hpp"
 
@@ -94,7 +94,7 @@ namespace Assets
         // Update after bind is needed here, for each binding and in the descriptor set layout creation.
         VkDescriptorPoolCreateInfo poolInfo = {};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT;
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT; // 允许绑定后更新描述符
         poolInfo.poolSizeCount = 1;
         poolInfo.pPoolSizes = pool_sizes_bindless;
         poolInfo.maxSets = k_max_bindless_resources * 1;
@@ -104,7 +104,7 @@ namespace Assets
 
         // create set layout
         VkDescriptorBindingFlags bindless_flags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT |
-            VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT;
+            VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT; // 允许部分描述符未初始化 | 动态数量的描述符 | 绑定后更新
 
         VkDescriptorSetLayoutBinding vk_binding;
         vk_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

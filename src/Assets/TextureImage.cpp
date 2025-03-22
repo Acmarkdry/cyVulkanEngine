@@ -3,19 +3,18 @@
 #include "Vulkan/Buffer.hpp"
 #include "Vulkan/CommandPool.hpp"
 #include "Vulkan/ImageView.hpp"
-#include "Vulkan/Image.hpp"
 #include "Vulkan/Sampler.hpp"
 #include <cstring>
 
 namespace Assets {
 
-TextureImage::TextureImage(Vulkan::CommandPool& commandPool, size_t width, size_t height, bool hdr, const unsigned char* data)
+TextureImage::TextureImage(Vulkan::CommandPool& commandPool, size_t width, size_t height, uint32_t miplevel, VkFormat format, const unsigned char* data, uint32_t size)
 {
 	// Create a host staging buffer and copy the image into it.
-	const VkDeviceSize imageSize = width * height * (hdr ? 16 : 4);
+	const VkDeviceSize imageSize = size;
 	const auto& device = commandPool.Device();
 
-	auto stagingBuffer = std::make_unique<Vulkan::Buffer>(device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	auto stagingBuffer = std::make_unique<Vulkan::Buffer>(device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT); // 表示缓冲区被用作数据传送命令的来源
 	auto stagingBufferMemory = stagingBuffer->AllocateMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	const auto stagingData = stagingBufferMemory.Map(0, imageSize);
@@ -23,13 +22,13 @@ TextureImage::TextureImage(Vulkan::CommandPool& commandPool, size_t width, size_
 	stagingBufferMemory.Unmap();
 	
 	// Create the device side image, memory, view and sampler.
-	image_.reset(new Vulkan::Image(device, VkExtent2D{ static_cast<uint32_t>(width), static_cast<uint32_t>(height) }, hdr ? VK_FORMAT_R32G32B32A32_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM));
+	image_.reset(new Vulkan::Image(device, VkExtent2D{ static_cast<uint32_t>(width), static_cast<uint32_t>(height) }, miplevel, format));
 	imageMemory_.reset(new Vulkan::DeviceMemory(image_->AllocateMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)));
 	imageView_.reset(new Vulkan::ImageView(device, image_->Handle(), image_->Format(), VK_IMAGE_ASPECT_COLOR_BIT));
 	sampler_.reset(new Vulkan::Sampler(device, Vulkan::SamplerConfig()));
 
 	// Transfer the data to device side.
-	image_->TransitionImageLayout(commandPool, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	image_->TransitionImageLayout(commandPool, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL); //将图像内存的布局优化为数据传输操作的数组，用于从buffer向该image写入数据的操作vkCmdCopyBufferToImage
 	image_->CopyFrom(commandPool, *stagingBuffer);
 
 	// cannot done this on non-graphicbit queue

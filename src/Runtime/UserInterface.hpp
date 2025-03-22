@@ -1,6 +1,7 @@
 #pragma once
 #include <functional>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include "Vulkan/Vulkan.hpp"
 #include "Vulkan/FrameBuffer.hpp"
 #include <vector>
@@ -29,7 +30,7 @@ namespace Vulkan
 	class RenderImage;
 }
 
-class UserSettings;
+struct UserSettings;
 
 struct Statistics final
 {
@@ -52,18 +53,18 @@ struct Statistics final
 
 class UserInterface final
 {
-	// ui框架部分
 public:
-	VULKAN_NON_COPIABLE(UserInterface);
-	
+
+	VULKAN_NON_COPIABLE(UserInterface)
+
 	UserInterface(
-	NextEngine* engine,
-	Vulkan::CommandPool& commandPool, 
-	const Vulkan::SwapChain& swapChain, 
-	const Vulkan::DepthBuffer& depthBuffer,
-	UserSettings& userSettings,
-	std::function<void()> funcPreConfig,
-	std::function<void()> funcInit);
+		NextEngine* engine,
+		Vulkan::CommandPool& commandPool, 
+		const Vulkan::SwapChain& swapChain, 
+		const Vulkan::DepthBuffer& depthBuffer,
+		UserSettings& userSettings,
+		std::function<void()> funcPreConfig,
+		std::function<void()> funcInit);
 	~UserInterface();
 
 	void PreRender();
@@ -101,5 +102,4 @@ private:
 	std::vector< std::function<void ()> > auxDrawRequest_;
 
 	NextEngine* engine_;
-	
 };

@@ -1,15 +1,8 @@
 #include "UserInterface.hpp"
 
-#include <Options.hpp>
-#include <Utils/Exception.hpp>
-#include <Utils/FileHelper.hpp>
-
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_vulkan.h"
-#include "imgui_freetype.h"
-#include "Assets/Texture.hpp"
-#include "Editor/IconsFontAwesome6.h"
-#include "Vulkan/DescriptorBinding.hpp"
+#include "SceneList.hpp"
+#include "UserSettings.hpp"
+#include "Utilities/Exception.hpp"
 #include "Vulkan/DescriptorPool.hpp"
 #include "Vulkan/Device.hpp"
 #include "Vulkan/Instance.hpp"
@@ -17,13 +10,46 @@
 #include "Vulkan/SingleTimeCommands.hpp"
 #include "Vulkan/Surface.hpp"
 #include "Vulkan/SwapChain.hpp"
-#include "Vulkan/VulkanBaseRenderer.hpp"
 #include "Vulkan/Window.hpp"
+#include "Engine.hpp"
+
+#include <imgui.h>
+#include <imgui_freetype.h>
+#if !ANDROID
+#include <imgui_impl_glfw.h>
+#else
+#include <imgui_impl_android.h>
+#endif
+#include <imgui_impl_vulkan.h>
+
+#include <array>
+#include <filesystem>
+#include <Editor/EditorGUI.h>
+#include <fmt/format.h>
+#include <fmt/chrono.h>
+
+#include "Engine.hpp"
+#include "Options.hpp"
+#include "Assets/TextureImage.hpp"
+#include "Utilities/FileHelper.hpp"
+#include "Utilities/Localization.hpp"
+#include "Utilities/Math.hpp"
+#include "Vulkan/VulkanBaseRenderer.hpp"
+#include "Editor/IconsFontAwesome6.h"
+#include "Utilities/ImGui.hpp"
+#include "Vulkan/ImageView.hpp"
 
 extern std::unique_ptr<Vulkan::VulkanBaseRenderer> GApplication;
 
-UserInterface::UserInterface(NextEngine* engine, Vulkan::CommandPool& commandPool, const Vulkan::SwapChain& swapChain, const Vulkan::DepthBuffer& depthBuffer, UserSettings& userSettings, std::function<void()> funcPreConfig, std::function<void()> funcInit):
-	userSettings_(userSettings_), engine_(engine)
+
+UserInterface::UserInterface(
+	NextEngine* engine,
+	Vulkan::CommandPool& commandPool, 
+	const Vulkan::SwapChain& swapChain, 
+	const Vulkan::DepthBuffer& depthBuffer,
+	UserSettings& userSettings, std::function<void()> funcPreConfig, std::function<void()> funcInit) :
+	userSettings_(userSettings),
+	engine_(engine)
 {
 	const auto& device = swapChain.Device();
 	const auto& window = device.Surface().Instance().Window();
@@ -151,8 +177,9 @@ UserInterface::~UserInterface()
 	ImGui_ImplVulkan_Shutdown();
 #if !ANDROID
 	ImGui_ImplGlfw_Shutdown();
+#else
+	ImGui_ImplAndroid_Shutdown();
 #endif
-
 	ImGui::DestroyContext();
 }
 
@@ -160,7 +187,7 @@ void UserInterface::OnCreateSurface(const Vulkan::SwapChain& swapChain, const Vu
 {
 	renderPass_.reset(new Vulkan::RenderPass(swapChain, depthBuffer, VK_ATTACHMENT_LOAD_OP_LOAD));
 	
-	for (const auto&imageView :swapChain.ImageViews())
+	for (const auto& imageView : swapChain.ImageViews())
 	{
 		uiFrameBuffers_.emplace_back(*imageView, *renderPass_, false);
 	}
@@ -170,6 +197,24 @@ void UserInterface::OnDestroySurface()
 {
 	renderPass_.reset();
 	uiFrameBuffers_.clear();
+}
+
+VkDescriptorSet UserInterface::RequestImTextureId(uint32_t globalTextureId)
+{
+	if( imTextureIdMap_.find(globalTextureId) == imTextureIdMap_.end() )
+	{
+		auto texture = Assets::GlobalTexturePool::GetTextureImage(globalTextureId);
+		if(texture)
+		{
+			imTextureIdMap_[globalTextureId] = ImGui_ImplVulkan_AddTexture(texture->Sampler().Handle(), texture->ImageView().Handle(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			return imTextureIdMap_[globalTextureId];
+		}
+	}
+	else
+	{
+		return imTextureIdMap_[globalTextureId];
+	}
+	return VK_NULL_HANDLE;
 }
 
 VkDescriptorSet UserInterface::RequestImTextureByName(const std::string& name)
@@ -440,6 +485,3 @@ void UserInterface::DrawIndicator(uint32_t frameCount)
 		ImGui::EndPopup();
 	}
 }
-
-
-

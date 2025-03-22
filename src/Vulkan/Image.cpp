@@ -1,20 +1,21 @@
-﻿#include "Image.hpp"
+#include "Image.hpp"
 #include "Buffer.hpp"
 #include "DepthBuffer.hpp"
 #include "Device.hpp"
 #include "SingleTimeCommands.hpp"
-#include "Utils/Exception.hpp"
+#include "Utilities/Exception.hpp"
 
 namespace Vulkan {
 
-Image::Image(const class Device& device, const VkExtent2D extent, const VkFormat format) :
-	Image(device, extent, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false)
+Image::Image(const class Device& device, const VkExtent2D extent, uint32_t miplevel, const VkFormat format) :
+	Image(device, extent, miplevel, format,  VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false)
 {
 }
 
 Image::Image(
 	const class Device& device, 
 	const VkExtent2D extent,
+	const uint32_t miplevel,
 	const VkFormat format,
 	const VkImageTiling tiling,
 	const VkImageUsageFlags usage,
@@ -31,7 +32,7 @@ Image::Image(
 	imageInfo.extent.width = extent.width;
 	imageInfo.extent.height = extent.height;
 	imageInfo.extent.depth = 1;
-	imageInfo.mipLevels = 1;
+	imageInfo.mipLevels = miplevel;
 	imageInfo.arrayLayers = 1;
 	imageInfo.format = format;
 	imageInfo.tiling = tiling;
@@ -48,11 +49,13 @@ Image::Image(
 #else
 	external_memory_image_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
-	
+
+#if !ANDROID
 	if(external_)
 	{
 		imageInfo.pNext = &external_memory_image_info;
 	}
+#endif
 
 	Check(vkCreateImage(device.Handle(), &imageInfo, nullptr, &image_),
 		"create image");
@@ -97,10 +100,7 @@ VkMemoryRequirements Image::GetMemoryRequirements() const
 
 void Image::TransitionImageLayout(CommandPool& commandPool, VkImageLayout newLayout)
 {
-	// VkCmdCopyBufferToImage调用之前，需要让图像满足一定的布局要求，所以有了这个函数
-	// image memory barrier 来对图像布局进行变换，
-	// 指令缓冲的提交会隐式的进行 VK_ACCESS_HOST_WRITE_BIT同步
-	
+	// 这个可是可以重点研究一下的对象
 	SingleTimeCommands::Submit(commandPool, [&](VkCommandBuffer commandBuffer)
 	{
 		VkImageMemoryBarrier barrier = {};
@@ -108,7 +108,7 @@ void Image::TransitionImageLayout(CommandPool& commandPool, VkImageLayout newLay
 		barrier.oldLayout = imageLayout_;
 		barrier.newLayout = newLayout;
 		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; // 不进行队列所有权维护，所以直接设置值为VK_QUEUE_FAMILY_IGNORED
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		barrier.image = image_;
 		barrier.subresourceRange.baseMipLevel = 0;
 		barrier.subresourceRange.levelCount = 1;
@@ -131,7 +131,7 @@ void Image::TransitionImageLayout(CommandPool& commandPool, VkImageLayout newLay
 
 		VkPipelineStageFlags sourceStage;
 		VkPipelineStageFlags destinationStage;
-		// 需要根据布局来变换barrier掩码
+
 		if (imageLayout_ == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) 
 		{
 			barrier.srcAccessMask = 0;
@@ -169,14 +169,13 @@ void Image::TransitionImageLayout(CommandPool& commandPool, VkImageLayout newLay
 
 void Image::CopyFrom(CommandPool& commandPool, const Buffer& buffer)
 {
-	// 将数据复制到图像的哪一个部分
 	SingleTimeCommands::Submit(commandPool, [&](VkCommandBuffer commandBuffer)
 	{
 		VkBufferImageCopy region = {};
 		region.bufferOffset = 0;
-		region.bufferRowLength = 0; // 这样就可以对每行图像数据使用额外的空间进行对齐
+		region.bufferRowLength = 0;
 		region.bufferImageHeight = 0;
-		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // 用于指定数据被复制到图像的哪一部分
+		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		region.imageSubresource.mipLevel = 0;
 		region.imageSubresource.baseArrayLayer = 0;
 		region.imageSubresource.layerCount = 1;

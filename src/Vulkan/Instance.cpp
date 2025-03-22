@@ -2,9 +2,9 @@
 #include "Enumerate.hpp"
 #include "Version.hpp"
 #include "Window.hpp"
-#include "Utils/Exception.hpp"
+#include "Utilities/Exception.hpp"
 #include <algorithm>
-#include <sstream>
+#include <fmt/format.h>
 
 namespace Vulkan {
 
@@ -104,11 +104,9 @@ void Instance::CheckVulkanMinimumVersion(const uint32_t minVersion)
 
 	if (minVersion > version)
 	{
-		std::ostringstream out;
-		out << "minimum required version not found (required " << to_string(Version(minVersion));
-		out << ", found " << to_string(Version(version)) << ")";
+		std::string out = fmt::format("minimum required version not found (required {}, found {})", to_string(Version(minVersion)), to_string(Version(version)));
 
-		Throw(std::runtime_error(out.str()));
+		Throw(std::runtime_error(out));
 	}
 	#endif
 }

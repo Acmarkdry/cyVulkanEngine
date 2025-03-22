@@ -1,5 +1,6 @@
 #pragma once
 #include "Assets/UniformBuffer.hpp"
+
 #include "Assets/Model.hpp"
 
 struct UserSettings final
