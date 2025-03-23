@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common/CoreMinimal.hpp"
 #include <cstdint>
 #include <exception>
 #include <string>
@@ -21,18 +22,11 @@ public:
 	~Options() = default;
 
 	// Application options.
-	bool Benchmark{};
 	bool SaveFile{};
 	bool RenderDoc{};
-	bool Denoiser{};
+	bool NoDenoiser{};
 	bool ForceSDR{};
-	bool Editor{};
 	std::string locale{};
-	
-	// Benchmark options.
-	bool BenchmarkNextScenes{};
-	uint32_t BenchmarkMaxTime{};
-	uint32_t BenchmarkMaxFrame{};
 
 	// Renderer options.
 	uint32_t Samples{};
@@ -40,11 +34,10 @@ public:
 	uint32_t MaxBounces{};
 	uint32_t RendererType{};
 	uint32_t Temporal{};
-	uint32_t RR_MIN_DEPTH{};
+
 	bool AdaptiveSample{};
 	
 	// Scene options.
-	uint32_t SceneIndex{};
 	std::string SceneName{};
 	std::string HDRIfile{};
 
@@ -58,4 +51,4 @@ public:
 	bool Fullscreen{};
 };
 
-inline const Options* GOption = nullptr;
+extern ENGINE_API Options* GOption;

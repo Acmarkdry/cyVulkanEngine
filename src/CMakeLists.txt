@@ -2,7 +2,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # directory naming
 file(GLOB_RECURSE src_files_assets "Assets/*.cpp" "Assets/*.hpp")
-file(GLOB_RECURSE src_files_utilities "Utils/*.cpp" "Utils/*.hpp")
+file(GLOB_RECURSE src_files_utilities "Utilities/*.cpp" "Utilities/*.hpp")
 file(GLOB_RECURSE src_files_vulkan "Vulkan/*.cpp" "Vulkan/*.hpp")
 file(GLOB_RECURSE src_files_thirdparty 
 	"ThirdParty/json11/*.cpp" 

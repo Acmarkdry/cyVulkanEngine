@@ -9,6 +9,7 @@
 #include "Vulkan/FrameBuffer.hpp"
 #include "Vulkan/Window.hpp"
 #include "Options.hpp"
+#include "Utilities/FileHelper.hpp"
 
 
 namespace qjs
@@ -17,7 +18,7 @@ namespace qjs
 	class Runtime;
 };
 
-Class NextEngine;
+class NextEngine;
 
 class NextGameInstanceBase
 {
