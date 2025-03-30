@@ -2,6 +2,9 @@
 
 void SimpleHit(const int InstCustIndex, const mat4x3 WorldToObject, const vec2 TwoBaryCoords, const int PrimitiveIndex, const int InstanceID, out vec3 HitNormal, out vec2 HitTexcoord, out uint MaterialId, out uint OutInstanceId  )
 {
+    // two bary coords 二元重心坐标
+    // world to object 世界空间到对象空间的变换矩阵
+
     // Get the material.
     const NodeProxy node = NodeProxies[InstanceID];
     const uvec2 offsets = Offsets[node.modelId];

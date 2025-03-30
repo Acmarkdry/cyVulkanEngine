@@ -5,6 +5,7 @@
 
 #define BENCH_MARK_CHECK() return
 #include <chrono>
+#include <functional>
 #include <map>
 
 #include "Image.hpp"

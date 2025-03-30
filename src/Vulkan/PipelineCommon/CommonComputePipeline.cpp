@@ -186,6 +186,7 @@ namespace Vulkan::PipelineCommon
 
     BufferClearPipeline::BufferClearPipeline(const SwapChain& swapChain):swapChain_(swapChain)
     {
+        // 调用buffer clear.comp来清空gpu缓冲区
         // Create descriptor pool/sets.
         const auto& device = swapChain.Device();
         const std::vector<DescriptorBinding> descriptorBindings =
