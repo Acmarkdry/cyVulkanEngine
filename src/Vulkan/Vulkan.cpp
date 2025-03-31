@@ -1,5 +1,6 @@
 #include "Vulkan.hpp"
-#include "Utils/Exception.hpp"
+#include "Utilities/Exception.hpp"
+#include <string>
 
 namespace Vulkan {
 

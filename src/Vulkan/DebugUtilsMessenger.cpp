@@ -1,8 +1,8 @@
 #include "DebugUtilsMessenger.hpp"
 
 #include "Instance.hpp"
-#include "Utils/Console.hpp"
-#include "Utils/Exception.hpp"
+#include "Utilities/Console.hpp"
+#include "Utilities/Exception.hpp"
 #include <fmt/format.h>
 
 namespace Vulkan {

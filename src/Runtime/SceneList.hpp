@@ -1,45 +1,30 @@
 #pragma once
-#include <unordered_map>
-#include<functional>
 
-#include "Assets/Model.hpp"
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace Assets
 {
-	class Node;
-	class Model;
-	class Texture;
-	class Material;
-	class LightObject;
-	class CameraInitialSate;
-
-	typedef std::pmr::unordered_map<std::string,std::string> uo_string_string_t;
-	const uo_string_string_t sceneNames =
-	{
-		{"qx50.glb",            "Qx50"},
-		{"track.glb",           "LowpolyTrack"},
-		{"simple.glb",          "Simple"},
-		{"complex.glb",         "Complex"},
-		{"livingroom.glb",      "LivingRoom"},
-		{"kitchen.glb",         "Kitchen"},
-		{"luxball.glb",         "LuxBall"},
-		{"moderndepart.glb",    "ModernHouse1"},
-	};
+    class Node;
+    class Model;
+    class Texture;
+    struct Material;
+    struct FMaterial;
+    struct LightObject;
+	struct AnimationTrack;
+    struct EnvironmentSetting;
 }
-
-typedef std::pair<std::string,std::function<void (Assets::CameraInitialSate&,
-	std::vector<Assets::Node>& nodes,
-	std::vector<Assets::Model>& models,
-	std::vector<Assets::Material>& materials,
-	std::vector<Assets::LightObject>& 
-	)>> scene_pairs;
 
 class SceneList final
 {
 public:
-	static void ScanScenes();
-	static int32_t AddExternalScene(std::string absPath);
+    static void ScanScenes();
+    static int32_t AddExternalScene(std::string absPath);
+    static std::vector<std::string> AllScenes;
 
-	static std::vector<scene_pairs> AllScenes;
+	static bool LoadScene(std::string filename, Assets::EnvironmentSetting& camera, std::vector< std::shared_ptr<Assets::Node> >& nodes, std::vector<Assets::Model>& models,
+                     std::vector<Assets::FMaterial>& materials,
+                     std::vector<Assets::LightObject>& lights,
+                     std::vector<Assets::AnimationTrack>& tracks);
 };
-

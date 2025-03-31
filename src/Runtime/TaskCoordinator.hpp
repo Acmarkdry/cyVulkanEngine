@@ -19,8 +19,7 @@ namespace details
         constexpr atomic_acq_rel() noexcept = default;
 
         constexpr atomic_acq_rel(T desired) noexcept : m_value{ std::forward<T>(desired) } {}
-        // forward 用于完美转发参数，避免不必要的拷贝或者移动操作
-        
+
         atomic_acq_rel(const atomic_acq_rel&) = delete;
         atomic_acq_rel(atomic_acq_rel&&) = delete;
 
@@ -89,7 +88,7 @@ namespace details
         }
 
     private:
-        std::atomic<T> m_value; // 用于实现原子操作，处理多线程
+        std::atomic<T> m_value;
     };
 }
 
@@ -225,9 +224,6 @@ public:
    
     ~TaskThread()
     {
-        std::thread::id threadId = thread_->get_id();
-        unsigned int ThreadIdAsInt = *static_cast<unsigned int*>(static_cast<void*>(&threadId));
-        fmt::print("TaskThread {} request shutting down, wait for task complete.\n", ThreadIdAsInt);
         complete_->wait();
         terminate_->set();
         thread_->join();
@@ -265,17 +261,7 @@ public:
         completeTaskQueue_.enqueue(task);
     }
     
-    uint32_t AddTask( ResTask::TaskFunc task_func, ResTask::TaskFunc complete_func, uint8_t priority = 0) const
-    {
-        static uint32_t task_id = 0;
-        ResTask task;
-        task.task_id = task_id++;
-        task.priority = priority;
-        task.task_func = std::move(task_func);
-        task.complete_func = std::move(complete_func);
-        threads_[priority]->taskQueue_.enqueue(task);
-        return task.task_id;
-    }
+    uint32_t AddTask( ResTask::TaskFunc task_func, ResTask::TaskFunc complete_func, uint8_t priority = 0);
 
     void WaitForTask(uint32_t task_id)
     {
@@ -283,15 +269,7 @@ public:
         // if task_id not found, it has been down, return immediately.
     }
 
-    void Tick()
-    {
-        ResTask task;
-        if( completeTaskQueue_.dequeue(task, false) )
-        {
-            task.complete_func(task);
-        }
-    }
-    
+    void Tick();
 
     static TaskCoordinator* GetInstance()
     {
@@ -304,6 +282,7 @@ public:
 
 private:
     std::vector< std::unique_ptr<TaskThread> > threads_;
+    tsqueue<ResTask> mainthreadTaskQueue_;
     tsqueue<ResTask> completeTaskQueue_;
 
 

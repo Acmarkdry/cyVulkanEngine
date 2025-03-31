@@ -2,7 +2,7 @@
 #include "DescriptorPool.hpp"
 #include "DescriptorSetLayout.hpp"
 #include "Device.hpp"
-#include "Utils/Exception.hpp"
+#include "Utilities/Exception.hpp"
 #include <array>
 #include <utility>
 

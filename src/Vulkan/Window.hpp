@@ -32,7 +32,6 @@ namespace Vulkan
 		double GetTime() const;
 
 		// Callbacks
-		std::function<void()> DrawFrame;
 		std::function<void(int key, int scancode, int action, int mods)> OnKey;
 		std::function<void(double xpos, double ypos)> OnCursorPosition;
 		std::function<void(int button, int action, int mods)> OnMouseButton;
@@ -43,14 +42,19 @@ namespace Vulkan
 		// Methods
 		void Close();
 		bool IsMinimized() const;
-		void Run();
+		bool IsMaximumed() const;
 		void WaitForEvents() const;
 		void Show() const;
 
 		void Minimize();
 		void Maximum();
+		void Restore();
 
 		void attemptDragWindow();
+
+		// Static methods
+		static void InitGLFW();
+		static void TerminateGLFW();
 	private:
 
 		const WindowConfig config_;

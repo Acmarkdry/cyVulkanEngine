@@ -1,6 +1,6 @@
 #include "Sampler.hpp"
 #include "Device.hpp"
-#include "Utils/Exception.hpp"
+#include "Utilities/Exception.hpp"
 
 namespace Vulkan {
 

@@ -2,10 +2,11 @@
 #include "Enumerate.hpp"
 #include "Instance.hpp"
 #include "Surface.hpp"
-#include "Utils/Exception.hpp"
-#include "RenderModel/DeviceProcedures.hpp"
+#include "Utilities/Exception.hpp"
+#include "Vulkan/RayTracing/DeviceProcedures.hpp"
 #include <algorithm>
 #include <set>
+#include <fmt/format.h>
 
 namespace Vulkan {
 
@@ -28,7 +29,7 @@ namespace
 
 		if (family == queueFamilies.end())
 		{
-			Throw(std::runtime_error("found no matching " + name + " queue"));
+			Throw(std::runtime_error(fmt::format("found no matching {} queue", name)));
 		}
 
 		return family;

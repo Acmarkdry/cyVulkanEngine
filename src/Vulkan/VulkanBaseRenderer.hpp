@@ -1,20 +1,15 @@
 #pragma once
 
-#include "FrameBuffer.hpp"
-#include "WindowConfig.hpp"
-#include "Assets/UniformBuffer.hpp"
-#include <vector>
-#include <list>
-#include <memory>
-#include <unordered_map>
-#include <cassert>
-#include <chrono>
-#include <glm/vec2.hpp>
-
-#include "Image.hpp"
-
 #define SCOPED_GPU_TIMER(name) ScopedGpuTimer scopedGpuTimer(commandBuffer, GpuTimer(), name)
 #define SCOPED_CPU_TIMER(name) ScopedCpuTimer scopedCpuTimer(GpuTimer(), name)
+
+#define BENCH_MARK_CHECK() return
+#include <chrono>
+#include <functional>
+#include <map>
+
+#include "Image.hpp"
+#include "ImageView.hpp"
 
 namespace Vulkan
 {
@@ -30,12 +25,20 @@ namespace Assets
 {
 	class GlobalTexturePool;
 	class Scene;
-	class UniformBufferObject;
+	struct UniformBufferObject;
 	class UniformBuffer;
 }
 
-namespace Vulkan 
+namespace Vulkan
 {
+	enum ERendererType
+	{
+		ERT_PathTracing,
+		ERT_Hybrid,
+		ERT_ModernDeferred,
+		ERT_LegacyDeferred,
+	};
+
 	class VulkanGpuTimer
 	{
 	public:
@@ -46,13 +49,21 @@ namespace Vulkan
 
 		void Reset(VkCommandBuffer commandBuffer)
 		{
-			vkCmdResetQueryPool(commandBuffer, query_pool_timestamps, 0, static_cast<uint32_t>(time_stamps.size()));
-			queryIdx = 0;
-			started_ = true;
+			BENCH_MARK_CHECK();
+		}
+
+		void CpuFrameEnd()
+		{
+			for(auto& [name, query] : cpu_timer_query_map)
+			{
+				// TODO 什么语法？
+				std::get<2>(cpu_timer_query_map[name]) = std::get<1>(cpu_timer_query_map[name]) - std::get<0>(cpu_timer_query_map[name]);
+			}
 		}
 
 		void FrameEnd(VkCommandBuffer commandBuffer)
 		{
+			BENCH_MARK_CHECK();
 			if(started_)
 			{
 				started_ = false;
@@ -80,6 +91,7 @@ namespace Vulkan
 
 		void Start(VkCommandBuffer commandBuffer, const char* name)
 		{
+			BENCH_MARK_CHECK();
 			if( timer_query_map.find(name) == timer_query_map.end())
 			{
 				timer_query_map[name] = std::make_tuple(0, 0);
@@ -90,6 +102,7 @@ namespace Vulkan
 		}
 		void End(VkCommandBuffer commandBuffer, const char* name)
 		{
+			BENCH_MARK_CHECK();
 			assert( timer_query_map.find(name) != timer_query_map.end() );
 			vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, query_pool_timestamps, queryIdx);
 			std::get<1>(timer_query_map[name]) = queryIdx;
@@ -97,14 +110,16 @@ namespace Vulkan
 		}
 		void StartCpuTimer(const char* name)
 		{
+			BENCH_MARK_CHECK();
 			if( cpu_timer_query_map.find(name) == cpu_timer_query_map.end())
 			{
-				cpu_timer_query_map[name] = std::make_tuple(0, 0);
+				cpu_timer_query_map[name] = std::make_tuple(0, 0, 0);
 			}
 			std::get<0>(cpu_timer_query_map[name]) = std::chrono::high_resolution_clock::now().time_since_epoch().count();
 		}
 		void EndCpuTimer(const char* name)
 		{
+			BENCH_MARK_CHECK();
 			assert( cpu_timer_query_map.find(name) != cpu_timer_query_map.end() );
 			std::get<1>(cpu_timer_query_map[name]) = std::chrono::high_resolution_clock::now().time_since_epoch().count();
 		}
@@ -122,7 +137,7 @@ namespace Vulkan
 			{
 				return 0;
 			}
-			return (std::get<1>(cpu_timer_query_map[name]) - std::get<0>(cpu_timer_query_map[name])) * 1e-6f;
+			return std::get<2>(cpu_timer_query_map[name]) * 1e-6f;
 		}
 		std::vector<std::tuple<std::string, float> > FetchAllTimes()
 		{
@@ -145,7 +160,7 @@ namespace Vulkan
 			{
 				if( startIdx < last_order)
 				{
-					prefix += " ";
+					prefix += "  ";
 					last_order = endIdx;
 				}
 				result.push_back(std::make_tuple(prefix + name, time));
@@ -157,7 +172,7 @@ namespace Vulkan
 		VkQueryPool query_pool_timestamps = VK_NULL_HANDLE;
 		std::vector<uint64_t> time_stamps{};
 		std::unordered_map<std::string, std::tuple<uint64_t, uint64_t> > timer_query_map{};
-		std::unordered_map<std::string, std::tuple<uint64_t, uint64_t> > cpu_timer_query_map{};
+		std::unordered_map<std::string, std::tuple<uint64_t, uint64_t, uint64_t> > cpu_timer_query_map{};
 		VkDevice device_ = VK_NULL_HANDLE;
 		uint32_t queryIdx = 0;
 		float timeStampPeriod_ = 1;
@@ -198,11 +213,10 @@ namespace Vulkan
 		VulkanGpuTimer* timer_;
 		std::string name_;
 	};
-	
+
 	class VulkanBaseRenderer
 	{
 	public:
-
 		VULKAN_NON_COPIABLE(VulkanBaseRenderer)
 
 		virtual ~VulkanBaseRenderer();
@@ -218,17 +232,11 @@ namespace Vulkan
 		bool HasSwapChain() const { return swapChain_.operator bool(); }
 
 		void SetPhysicalDevice(VkPhysicalDevice physicalDevice);
-		void Run();
 		
 		void Start();
-		bool Tick();
 		void End();
-
-		virtual void OnTouch(bool down, double xpos, double ypos) {}
-		virtual void OnTouchMove(double xpos, double ypos) {}
-		virtual bool GetFocusDistance(float& distance) const {return false;}
-		// virtual bool GetLastRaycastResult(Assets::RayCastResult& result) const {return false;}
-		// virtual void SetRaycastRay(glm::vec3 org, glm::vec3 dir) const {};
+		
+		virtual void SetRaycastRay(glm::vec3 org, glm::vec3 dir, std::function<bool(Assets::RayCastResult)> callback) {};
 		
 		void CaptureScreenShot();
 		void CaptureEditorViewport(VkCommandBuffer commandBuffer, const uint32_t imageIndex);
@@ -236,11 +244,10 @@ namespace Vulkan
 		
 		RenderImage& GetRenderImage() const {return *rtEditorViewport_;}
 
-		const std::string& GetRendererType() const {return rendererType_;}
-		
-	protected:
+		virtual void DrawFrame();
 
-		VulkanBaseRenderer(const char* rendererType, const WindowConfig& windowConfig, VkPresentModeKHR presentMode, bool enableValidationLayers);
+
+		VulkanBaseRenderer(Vulkan::Window* window, VkPresentModeKHR presentMode, bool enableValidationLayers);
 
 		const class Device& Device() const { return *device_; }
 		class CommandPool& CommandPool() { return *commandPool_; }
@@ -251,8 +258,11 @@ namespace Vulkan
 		const bool CheckerboxRendering() {return checkerboxRendering_;}
 		class VulkanGpuTimer* GpuTimer() const {return gpuTimer_.get();}
 		
-		virtual const Assets::Scene& GetScene() const = 0;
-		virtual Assets::UniformBufferObject GetUniformBufferObject(const VkOffset2D offset, const VkExtent2D extent) const = 0;
+		Assets::Scene& GetScene();
+		void SetScene(std::shared_ptr<Assets::Scene> scene);
+		virtual Assets::UniformBufferObject GetUniformBufferObject(const VkOffset2D offset, const VkExtent2D extent) const;
+
+		int FrameCount() const {return frameCount_;}
 
 		virtual void SetPhysicalDeviceImpl(
 			VkPhysicalDevice physicalDevice, 
@@ -263,44 +273,57 @@ namespace Vulkan
 		virtual void OnDeviceSet();
 		virtual void CreateSwapChain();
 		virtual void DeleteSwapChain();
-		virtual void DrawFrame();
 		virtual void Render(VkCommandBuffer commandBuffer, uint32_t imageIndex);
-		virtual void RenderUI(VkCommandBuffer commandBuffer, uint32_t imageIndex) {}
 
-		virtual void BeforeNextFrame() {}
+		virtual void BeforeNextFrame();
+
 		virtual void AfterRenderCmd() {}
 		virtual void AfterPresent() {}
+		virtual void AfterUpdateScene() {}
 
 		virtual void OnPreLoadScene() {}
 		virtual void OnPostLoadScene() {}
 
-		virtual void OnKey(int key, int scancode, int action, int mods) { }
-		virtual void OnCursorPosition(double xpos, double ypos) { }
-		virtual void OnMouseButton(int button, int action, int mods) { }
-		virtual void OnScroll(double xoffset, double yoffset) { }
-		virtual void OnDropFile(int path_count, const char* paths[]) { }
-		bool isWireFrame_{};
+		bool VisualDebug() const {return visualDebug_;}
+
+		virtual void RegisterLogicRenderer(ERendererType type);
+		virtual void SwitchLogicRenderer(ERendererType type);
+
+		// Callbacks
+		std::function<void()> DelegateOnDeviceSet;
+		std::function<void()> DelegateCreateSwapChain;
+		std::function<void()> DelegateDeleteSwapChain;
+		std::function<void()> DelegateBeforeNextTick;
+		std::function<Assets::UniformBufferObject(VkOffset2D, VkExtent2D)> DelegateGetUniformBufferObject;
+		std::function<void(VkCommandBuffer, uint32_t)> DelegatePostRender;
+
+		DeviceMemory* GetScreenShotMemory() const {return screenShotImageMemory_.get();}
+	
+		std::weak_ptr<Assets::Scene> scene_;
+		
 		bool checkerboxRendering_{};
 		bool supportRayTracing_ {};
 		bool supportDenoiser_ {};
+		bool supportRayCast_ {};
+		bool showWireframe_ {};
 		int frameCount_{};
-		bool supportScreenShot_{};
 		bool forceSDR_{};
 		bool visualDebug_{};
-
-		std::string rendererType_{};
-
+	protected:
 		Assets::UniformBufferObject lastUBO;
 
-		DeviceMemory* GetScreenShotMemory() const {return screenShotImageMemory_.get();}
+		
 	private:
 
 		void UpdateUniformBuffer(uint32_t imageIndex);
 		void RecreateSwapChain();
 
 		const VkPresentModeKHR presentMode_;
+
+		std::map< ERendererType, std::unique_ptr<class LogicRendererBase> > logicRenderers_;
+		ERendererType currentLogicRenderer_;
 		
-		std::unique_ptr<class Window> window_;
+		class Window* window_;
 		std::unique_ptr<class Instance> instance_;
 		std::unique_ptr<class DebugUtilsMessenger> debugUtilsMessenger_;
 		std::unique_ptr<class Surface> surface_;
@@ -334,5 +357,37 @@ namespace Vulkan
 
 		uint64_t uptime {};
 	};
+	
+	class LogicRendererBase
+	{
+	public:
+		LogicRendererBase( VulkanBaseRenderer& baseRender );
+		virtual ~LogicRendererBase() {};
 
+		virtual void OnDeviceSet() {};
+		virtual void CreateSwapChain() {};
+		virtual void DeleteSwapChain() {};
+		virtual void Render(VkCommandBuffer commandBuffer, uint32_t imageIndex) {};
+		virtual void BeforeNextFrame() {};
+		
+		VulkanBaseRenderer& baseRender_;
+		template<typename T>
+		T& GetBaseRender() { return static_cast<T&>(baseRender_); }
+
+		const class SwapChain& SwapChain() const { return baseRender_.SwapChain(); }
+		class Window& Window() { return baseRender_.Window(); }
+		
+		const class Device& Device() const { return baseRender_.Device(); }
+		class CommandPool& CommandPool() { return baseRender_.CommandPool(); }
+		const class DepthBuffer& DepthBuffer() const { return baseRender_.DepthBuffer(); }
+		const std::vector<Assets::UniformBuffer>& UniformBuffers() const { return baseRender_.UniformBuffers(); }
+		class VulkanGpuTimer* GpuTimer() const {return baseRender_.GpuTimer();}
+		
+		const Assets::Scene& GetScene() {return baseRender_.GetScene();}
+
+		int FrameCount() const {return baseRender_.FrameCount();}
+
+		bool VisualDebug() const {return baseRender_.VisualDebug();}
+	};
+	};
 }

@@ -57,6 +57,9 @@ vec2(-2.0,  2.0), vec2(-1.0,  2.0), vec2(0.0,  2.0), vec2(1.0,  2.0), vec2(2.0, 
 
 // a simple accumulation shader, reproject can impl here later.
 void main() {
+	// temporal anti aliasing 时间抗锯齿
+	// temporal accumulation 时间性积累
+	// 
     ivec2 ipos = ivec2(gl_GlobalInvocationID.xy) + ivec2(Camera.ViewportRect.x, Camera.ViewportRect.y);
 
     vec4 src = imageLoad(NewSourceImage, ipos);
@@ -65,8 +68,8 @@ void main() {
 
     bool useHistory = true;
     vec4 final = src;
-    vec2 motion = imageLoad(MotionVectorImage, ipos).rg;
-	ivec2 previpos = ivec2( floor(ipos + motion) );
+    vec2 motion = imageLoad(MotionVectorImage, ipos).rg; // 从上一帧到当前帧的运动偏移
+	ivec2 previpos = ivec2( floor(ipos + motion) ); 
 	const bool inside = all(lessThan(previpos, ivec2(Camera.ViewportRect.xy + Camera.ViewportRect.zw))) && all(greaterThanEqual(previpos, ivec2(Camera.ViewportRect.xy) + ivec2(-1,-1)));
 	// 以前的稳定，是一种偶然，当相机不动的时候，我们假设不check，所以都是直接用histroy，但是在边缘的位置，总会有闪烁。这种闪烁因为motion归0而消除，这是不对的
 	// after, motionvector calculate last frame position

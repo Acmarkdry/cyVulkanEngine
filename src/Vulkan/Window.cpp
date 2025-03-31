@@ -1,9 +1,11 @@
 #include "Window.hpp"
-#include "Utils/Exception.hpp"
-#include "Utils/StbImage.hpp"
+#include "Utilities/Exception.hpp"
+#include "Utilities/StbImage.hpp"
 #include <fmt/format.h>
 
 #include "Options.hpp"
+#include "Utilities/Console.hpp"
+#include "Utilities/FileHelper.hpp"
 
 #if ANDROID
 #include <time.h>
@@ -84,23 +86,13 @@ Window::Window(const WindowConfig& config) :
 	config_(config)
 {
 #if !ANDROID
-	glfwSetErrorCallback(GlfwErrorCallback);
-
-	if (!glfwInit())
-	{
-		Throw(std::runtime_error("glfwInit() failed"));
-	}
-
-	if (!glfwVulkanSupported())
-	{
-		Throw(std::runtime_error("glfwVulkanSupported() failed"));
-	}
-
 	// hide title bar, handle in ImGUI Later
-	// if(GOption->Editor)
-	// {
-	// 	glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
-	// }
+
+	if (config.HideTitleBar)
+	{
+		glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+	}
+
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, config.Resizable ? GLFW_TRUE : GLFW_FALSE);
 
@@ -114,8 +106,19 @@ Window::Window(const WindowConfig& config) :
 		Throw(std::runtime_error("failed to create window"));
 	}
 
+#if !ANDROID
+	const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+	if (mode) {
+		int windowPosX = (mode->width - config.Width) / 2;
+		int windowPosY = (mode->height - config.Height) / 2;
+		glfwSetWindowPos(window_, windowPosX, windowPosY); 
+	} 
+#endif
+
 	GLFWimage icon;
-	icon.pixels = stbi_load("../assets/textures/Vulkan.png", &icon.width, &icon.height, nullptr, 4);
+	std::vector<uint8_t> data;
+	Utilities::Package::FPackageFileSystem::GetInstance().LoadFile("assets/textures/Vulkan.png", data);
+	icon.pixels = stbi_load_from_memory(data.data(), static_cast<int>(data.size()), &icon.width, &icon.height, nullptr, 4);
 	if (icon.pixels == nullptr)
 	{
 		Throw(std::runtime_error("failed to load icon"));
@@ -149,9 +152,6 @@ Window::~Window()
 		glfwDestroyWindow(window_);
 		window_ = nullptr;
 	}
-
-	glfwTerminate();
-	glfwSetErrorCallback(nullptr);
 #endif
 }
 
@@ -232,21 +232,12 @@ bool Window::IsMinimized() const
 	return size.height == 0 && size.width == 0;
 }
 
-void Window::Run()
+bool Window::IsMaximumed() const
 {
 #if !ANDROID
-	glfwSetTime(0.0);
-
-	while (!glfwWindowShouldClose(window_))
-	{
-		glfwPollEvents();
-
-		if (DrawFrame)
-		{
-			DrawFrame();
-		}
-	}
+	return glfwGetWindowAttrib(window_, GLFW_MAXIMIZED);
 #endif
+	return false;
 }
 
 void Window::WaitForEvents() const
@@ -264,12 +255,22 @@ void Window::Show() const
 }
 
 void Window::Minimize() {
+#if !ANDROID
 	//glfwSetWindowSize(window_, 0,0);
+	glfwIconifyWindow(window_);
+#endif
 }
 
 void Window::Maximum() {
 #if !ANDROID
 	glfwMaximizeWindow(window_);
+#endif
+}
+
+void Window::Restore()
+{
+#if !ANDROID
+	glfwRestoreWindow(window_);
 #endif
 }
 
@@ -301,6 +302,30 @@ void Window::attemptDragWindow() {
 	if (glfwGetMouseButton(window_, 0) == GLFW_RELEASE && dragState == 1) {
 		dragState = 0;
 	}
+#endif
+}
+
+void Window::InitGLFW()
+{
+#if !ANDROID
+	glfwSetErrorCallback(GlfwErrorCallback);
+	if (!glfwInit())
+	{
+		Throw(std::runtime_error("glfwInit() failed"));
+	}
+
+	if (!glfwVulkanSupported())
+	{
+		Throw(std::runtime_error("glfwVulkanSupported() failed"));
+	}
+#endif
+}
+
+void Window::TerminateGLFW()
+{
+#if !ANDROID
+	glfwTerminate();
+	glfwSetErrorCallback(nullptr);
 #endif
 }
 }

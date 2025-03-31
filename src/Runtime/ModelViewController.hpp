@@ -1,20 +1,27 @@
 #pragma once
 
-#include "Utils/Glm.hpp"
+#include "Utilities/Glm.hpp"
+
+namespace Assets
+{
+	struct Camera;
+}
 
 class ModelViewController final
 {
 public:
 
-	void Reset(const glm::mat4& modelView);
+	void Reset(const Assets::Camera& RenderCamera);
 
 	glm::mat4 ModelView() const;
+	float FieldOfView() const { return fieldOfView_; }
 	glm::vec4 Position() const { return position_; }
 
 	bool OnKey(int key, int scancode, int action, int mods);
 	bool OnCursorPosition(double xpos, double ypos);
 	bool OnMouseButton(int button, int action, int mods);
 	bool OnTouch(bool down, double xpos, double ypos);
+	void OnScroll(double xoffset, double yoffset);
 	bool UpdateCamera(double speed, double timeDelta);
 
 private:
@@ -41,16 +48,25 @@ private:
 	bool cameraMovingDown_{};
 	bool cameraMovingUp_{};
 
+	// with smooth movement
 	double cameraRotX_{};
 	double cameraRotY_{};
 	double modelRotX_{};
 	double modelRotY_{};
+
+	double rawCameraRotX_ {};
+	double rawCameraRotY_ {};
+	double rawModelRotX_ {};
+	double rawModelRotY_ {};
 	
 	double mousePosX_{};
 	double mousePosY_{};
-	
+
+	bool resetMousePos_{};
 	bool mouseLeftPressed_{};
 	bool mouseRightPressed_{};
 
 	double mouseSensitive_ {};
+
+	float fieldOfView_ {};
 };
