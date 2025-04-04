@@ -1,12 +1,13 @@
 #pragma once
 
-#include <glm/vec3.hpp>
+#include <memory>
+#include <glm/glm.hpp>
+
 #include <Jolt/Jolt.h>
-#include <Jolt/Math/Math.h>
 #include <Jolt/Physics/Body/BodyID.h>
 #include <Jolt/Physics/Body/MotionType.h>
 
-#include "Vulkan/vulkan.hpp"
+#include "Vulkan/Vulkan.hpp"
 
 struct FNextPhysicsContext;
 
@@ -32,7 +33,6 @@ struct FNextPhysicsBody
 	JPH::BodyID bodyID;
 };
 
-
 class NextPhysics final
 {
 public:
@@ -44,21 +44,22 @@ public:
 	void Start();
 	void Tick(double DeltaSeconds);
 	void Stop();
-
+    
 	JPH::BodyID CreateSphereBody(glm::vec3 position, float radius, JPH::EMotionType motionType);
 	JPH::BodyID CreatePlaneBody(glm::vec3 position, glm::vec3 extent, JPH::EMotionType motionType);
 
 	FNextPhysicsBody* GetBody(JPH::BodyID bodyID);
 
 	void OnSceneStarted();
-	void OnSceneEnded();
-
+	void OnSceneDestroyed();
 private:
-	JPH::BodyID AddBodyInternal(FNextPhysicsBody& body);
 
+	JPH::BodyID AddBodyInternal(FNextPhysicsBody& body);
+    
 	std::unique_ptr<FNextPhysicsContext> context_;
 	std::unordered_map<JPH::BodyID, FNextPhysicsBody> bodies_;
 
 	double TimeElapsed {};
 	double TimeSimulated {};
 };
+

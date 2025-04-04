@@ -1,34 +1,36 @@
-#program once
+#pragma once
 
 #include "Common/CoreMinimal.hpp"
 #include "SceneList.hpp"
-#include  "UserSettings.hpp"
+#include "UserSettings.hpp"
 #include "Assets/UniformBuffer.hpp"
 #include "Assets/Model.hpp"
-#include "Vulkan/VulkanBaseRenderer.hpp"
 #include "Vulkan/FrameBuffer.hpp"
 #include "Vulkan/Window.hpp"
+#include "Vulkan/VulkanBaseRenderer.hpp"
 #include "Options.hpp"
+#include "ThirdParty/miniaudio/miniaudio.h"
 #include "Utilities/FileHelper.hpp"
 
+class NextPhysics;
 
 namespace qjs
 {
 	class Context;
 	class Runtime;
-};
+}
 
 class NextEngine;
 
 class NextGameInstanceBase
 {
 public:
-	NextGameInstanceBase(Vulkan::WindowConfig&config, Options& options, NextEngine* engine) {}
+	NextGameInstanceBase(Vulkan::WindowConfig& config, Options& options, NextEngine* engine){}
 	virtual ~NextGameInstanceBase() {}
-	virtual void OnInit() = 0;
-	virtual void OnTick(double deltaSeconds) = 0;
-	virtual void OnDestroy() = 0;
-	virtual void OnRenderUI() = 0;
+	virtual void OnInit() =0;
+	virtual void OnTick(double deltaSeconds) =0;
+	virtual void OnDestroy() =0;
+	virtual bool OnRenderUI() =0;
 	virtual void OnPreConfigUI() {}
 	virtual void OnInitUI() {}
 	virtual void OnRayHitResponse(Assets::RayCastResult& result) {}
@@ -47,11 +49,10 @@ public:
 	virtual bool OnScroll(double xoffset, double yoffset) {return false;}
 };
 
-
-class NextGameInstanceVoid: public NextGameInstanceBase
+class NextGameInstanceVoid : public NextGameInstanceBase
 {
 public:
-	NextGameInstanceVoid(Vulkan::WindowConfig& config, Options& options, NextEngine* engine):NextGameInstanceBase(config, options, engine) {}
+	NextGameInstanceVoid(Vulkan::WindowConfig& config, Options& options, NextEngine* engine):NextGameInstanceBase(config,options,engine){}
 	~NextGameInstanceVoid() override = default;
 	
 	void OnInit() override {}
@@ -63,7 +64,6 @@ public:
 	bool OnKey(int key, int scancode, int action, int mods) override {return false;}
 	bool OnCursorPosition(double xpos, double ypos) override {return false;}
 	bool OnMouseButton(int button, int action, int mods) override {return false;}
-	
 };
 
 extern std::unique_ptr<NextGameInstanceBase> CreateGameInstance(Vulkan::WindowConfig& config, Options& options, NextEngine* engine);
@@ -99,7 +99,7 @@ public:
 	std::vector<NextComponent*> components;
 };
 
-class NextComponent: std::enable_shared_from_this<NextComponent>
+class NextComponent : std::enable_shared_from_this<NextComponent>
 {
 public:
 	NextComponent() = default;
@@ -248,14 +248,14 @@ private:
 	std::vector<FDelayTaskContext> delayedTasks_;
 
 	// audio
-	// std::unique_ptr<struct ma_engine> audioEngine_;
-	// std::unordered_map<std::string, std::unique_ptr<ma_sound> > soundMaps_;
+	std::unique_ptr<struct ma_engine> audioEngine_;
+	std::unordered_map<std::string, std::unique_ptr<ma_sound> > soundMaps_;
 
 	// physics
-	// std::unique_ptr<NextPhysics> physicsEngine_;
+	std::unique_ptr<NextPhysics> physicsEngine_;
 
 	// package
-	// std::unique_ptr<Utilities::Package::FPackageFileSystem> packageFileSystem_;
+	std::unique_ptr<Utilities::Package::FPackageFileSystem> packageFileSystem_;
 
 	// engine status
 	NextRenderer::EApplicationStatus status_{};
