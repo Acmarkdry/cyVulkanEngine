@@ -35,6 +35,7 @@
 // #include "LegacyDeferred/LegacyDeferredRenderer.hpp"
 // #include "ModernDeferred/ModernDeferredRenderer.hpp"
 // #include "RayQuery/RayQueryRenderer.hpp"
+#include "ModernDeferred/ModernDeferredRenderer.hpp"
 #include "Vulkan/PipelineCommon/CommonComputePipeline.hpp"
 
 namespace 
@@ -706,7 +707,7 @@ namespace Vulkan
             // logicRenderers_[type] = std::make_unique<HybridDeferred::HybridDeferredRenderer>(*this);
                 break;
         case ERendererType::ERT_ModernDeferred:
-            // logicRenderers_[type] = std::make_unique<ModernDeferred::ModernDeferredRenderer>(*this);
+                logicRenderers_[type] = std::make_unique<ModernDeferred::ModernDeferredRenderer>(*this);
                 break;
         case ERendererType::ERT_LegacyDeferred:
             // logicRenderers_[type] = std::make_unique<LegacyDeferred::LegacyDeferredRenderer>(*this);
