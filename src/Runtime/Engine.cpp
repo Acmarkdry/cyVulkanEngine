@@ -35,6 +35,7 @@
 #define BUILDVER(X) std::string buildver(#X);
 #include "build.version"
 #include "NextPhysics.hpp"
+#include "Vulkan/RayTracing/RayTraceBaseRenderer.hpp"
 
 ENGINE_API Options* GOption = nullptr;
 
@@ -54,6 +55,18 @@ namespace NextRenderer
             case 2:
             case 3:
                 {
+                    auto ptr = new Vulkan::RayTracing::RayTraceBaseRenderer(window, presentMode, enableValidationLayers);
+                    if(!ptr->supportRayTracing_) {
+                        break;
+                    }
+#if !ANDROID
+                    ptr->RegisterLogicRenderer(Vulkan::ERT_PathTracing);
+#endif
+                    ptr->RegisterLogicRenderer(Vulkan::ERT_Hybrid);
+                    ptr->RegisterLogicRenderer(Vulkan::ERT_ModernDeferred);
+                    ptr->RegisterLogicRenderer(Vulkan::ERT_LegacyDeferred);
+                    ptr->SwitchLogicRenderer(static_cast<Vulkan::ERendererType>(rendererType));
+                    return ptr;    
                 }
             default: break;
         }
@@ -146,7 +159,7 @@ NextEngine::NextEngine(Options& options, void* userdata)
     // Create Window
     Vulkan::WindowConfig windowConfig
     {
-        "gkNextRenderer " + NextRenderer::GetBuildVersion(),
+        "cyNextRenderer " + NextRenderer::GetBuildVersion(),
         options.Width,
         options.Height,
         options.Fullscreen,

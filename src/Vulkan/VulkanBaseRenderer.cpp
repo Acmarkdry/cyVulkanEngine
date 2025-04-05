@@ -36,6 +36,7 @@
 // #include "ModernDeferred/ModernDeferredRenderer.hpp"
 // #include "RayQuery/RayQueryRenderer.hpp"
 #include "ModernDeferred/ModernDeferredRenderer.hpp"
+#include "RayQuery/RayQueryRenderer.hpp"
 #include "Vulkan/PipelineCommon/CommonComputePipeline.hpp"
 
 namespace 
@@ -701,7 +702,7 @@ namespace Vulkan
         switch (type)
         {
         case ERendererType::ERT_PathTracing:
-            // logicRenderers_[type] = std::make_unique<RayTracing::RayQueryRenderer>(*this);
+                logicRenderers_[type] = std::make_unique<RayTracing::RayQueryRenderer>(*this);
                 break;
         case ERendererType::ERT_Hybrid:
             // logicRenderers_[type] = std::make_unique<HybridDeferred::HybridDeferredRenderer>(*this);
