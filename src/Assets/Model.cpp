@@ -47,7 +47,7 @@
 #include "Options.hpp"
 #include "Texture.hpp"
 #include "Runtime/Engine.hpp"
-#include "Runtime/NextPhysics.h"
+#include "Runtime/NextPhysics.hpp"
 
 #define FLATTEN_VERTICE 1
 

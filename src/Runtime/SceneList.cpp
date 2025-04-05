@@ -8,7 +8,7 @@
 #include <algorithm>
 
 #include "Engine.hpp"
-#include "NextPhysics.h"
+#include "NextPhysics.hpp"
 #include "Utilities/FileHelper.hpp"
 #include "Vulkan/VulkanBaseRenderer.hpp"
 

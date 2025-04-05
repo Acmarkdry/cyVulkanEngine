@@ -5,7 +5,7 @@
 #include "Vertex.hpp"
 #include "Texture.hpp"
 #include "UniformBuffer.hpp"
-#include "Runtime/NextPhysics.h"
+#include "Runtime/NextPhysics.hpp"
 
 #include <memory>
 #include <set>

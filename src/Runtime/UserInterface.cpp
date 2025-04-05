@@ -24,7 +24,6 @@
 
 #include <array>
 #include <filesystem>
-#include <Editor/EditorGUI.h>
 #include <fmt/format.h>
 #include <fmt/chrono.h>
 

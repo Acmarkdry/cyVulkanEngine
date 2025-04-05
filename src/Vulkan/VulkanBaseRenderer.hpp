@@ -1,16 +1,26 @@
 #pragma once
 
-#define SCOPED_GPU_TIMER(name) ScopedGpuTimer scopedGpuTimer(commandBuffer, GpuTimer(), name)
-#define SCOPED_CPU_TIMER(name) ScopedCpuTimer scopedCpuTimer(GpuTimer(), name)
-
-#define BENCH_MARK_CHECK() return
+#include "FrameBuffer.hpp"
+#include "WindowConfig.hpp"
+#include "Assets/UniformBuffer.hpp"
+#include <vector>
+#include <list>
+#include <memory>
+#include <unordered_map>
+#include <cassert>
 #include <chrono>
 #include <functional>
 #include <map>
+#include <glm/vec2.hpp>
 
 #include "Image.hpp"
-#include "ImageView.hpp"
+#include "Options.hpp"
+#include "Assets/Scene.hpp"
 
+#define SCOPED_GPU_TIMER(name) ScopedGpuTimer scopedGpuTimer(commandBuffer, GpuTimer(), name)
+#define SCOPED_CPU_TIMER(name) ScopedCpuTimer scopedCpuTimer(GpuTimer(), name)
+//#define BENCH_MARK_CHECK() if(GOption->Benchmark) return
+#define BENCH_MARK_CHECK() return // disable gpu timer since performance hit
 namespace Vulkan
 {
 	namespace PipelineCommon
@@ -29,7 +39,7 @@ namespace Assets
 	class UniformBuffer;
 }
 
-namespace Vulkan
+namespace Vulkan 
 {
 	enum ERendererType
 	{
@@ -38,7 +48,7 @@ namespace Vulkan
 		ERT_ModernDeferred,
 		ERT_LegacyDeferred,
 	};
-
+	
 	class VulkanGpuTimer
 	{
 	public:
@@ -50,13 +60,16 @@ namespace Vulkan
 		void Reset(VkCommandBuffer commandBuffer)
 		{
 			BENCH_MARK_CHECK();
+			vkCmdResetQueryPool(commandBuffer, query_pool_timestamps, 0, static_cast<uint32_t>(time_stamps.size()));
+			queryIdx = 0;
+			started_ = true;
 		}
 
 		void CpuFrameEnd()
 		{
+			// iterate the cpu_timer_query_map
 			for(auto& [name, query] : cpu_timer_query_map)
 			{
-				// TODO 什么语法？
 				std::get<2>(cpu_timer_query_map[name]) = std::get<1>(cpu_timer_query_map[name]) - std::get<0>(cpu_timer_query_map[name]);
 			}
 		}
@@ -213,10 +226,11 @@ namespace Vulkan
 		VulkanGpuTimer* timer_;
 		std::string name_;
 	};
-
+	
 	class VulkanBaseRenderer
 	{
 	public:
+
 		VULKAN_NON_COPIABLE(VulkanBaseRenderer)
 
 		virtual ~VulkanBaseRenderer();
@@ -389,5 +403,5 @@ namespace Vulkan
 
 		bool VisualDebug() const {return baseRender_.VisualDebug();}
 	};
-	};
+
 }

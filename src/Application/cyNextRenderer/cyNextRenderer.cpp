@@ -50,7 +50,7 @@ bool NextRendererGameInstance::OnRenderUI()
 
 void NextRendererGameInstance::OnInitUI()
 {
-	NextGameInstanceBase::OnInit();
+	NextGameInstanceBase::OnInitUI();
 }
 
 bool NextRendererGameInstance::OverrideRenderCamera(Assets::Camera& OutRenderCamera) const

@@ -27,8 +27,8 @@ class NextGameInstanceBase
 public:
 	NextGameInstanceBase(Vulkan::WindowConfig& config, Options& options, NextEngine* engine){}
 	virtual ~NextGameInstanceBase() {}
-	virtual void OnInit() =0;
-	virtual void OnTick(double deltaSeconds) =0;
+	virtual void OnInit() = 0;
+	virtual void OnTick(double deltaSeconds) = 0;
 	virtual void OnDestroy() =0;
 	virtual bool OnRenderUI() =0;
 	virtual void OnPreConfigUI() {}
