@@ -13,6 +13,11 @@
 
 ## Runtime Effect
 
+![Alt text](doc/image_attachment/4e5ac3860c62899e8d5b3d50fa17496.png?raw=true "Qx50")
+![Alt text](doc/image_attachment/268f641ee2ffa1e4428b18e49857b17.png?raw=true "Qx50")
+![Alt text](doc/image_attachment/6baeb46748d6977daeb47eace2a01c9.png?raw=true "Qx50")
+![Alt text](doc/image_attachment//d43ee196277029fae11351a0b8570e6.png?raw=true "Qx50")
+
 
 ## 参考项目
 [RayTracingVulkan](https://github.com/GPSnoopy/RayTracingInVulkan)
