@@ -4,6 +4,8 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 file(GLOB_RECURSE src_files_assets "Assets/*.cpp" "Assets/*.hpp")
 file(GLOB_RECURSE src_files_utilities "Utilities/*.cpp" "Utilities/*.hpp")
 file(GLOB_RECURSE src_files_vulkan "Vulkan/*.cpp" "Vulkan/*.hpp")
+file(GLOB_RECURSE src_files_task_queue "TaskQueue/*.cpp" "TaskQueue/*.h")
+
 file(GLOB_RECURSE src_files_thirdparty 
 	"ThirdParty/json11/*.cpp" 
 	"ThirdParty/json11/*.hpp" 
@@ -46,6 +48,7 @@ add_library(cyNextEngine
 	${src_files_utilities} 
 	${src_files_engine}
 	${src_files_vulkan} 
+	${src_files_task_queue}
 	${src_files_thirdparty}
 )
 add_library(cyNextRenderer SHARED
@@ -59,6 +62,7 @@ add_library(cyNextEngine
 	${src_files_utilities} 
 	${src_files_engine}
 	${src_files_vulkan} 
+	${src_files_task_queue}
 	${src_files_thirdparty}
 )
 add_executable(cyNextRenderer
