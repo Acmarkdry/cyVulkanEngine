@@ -1,39 +1,45 @@
 #pragma once
 
-#include "mutex"
-#include "condition_variable"
+#include <mutex>
+#include <condition_variable>
 
-namespace TaskQueue
-{
-    class Event
-    {
-    public:
-        static const int kForever = -1;
-        
-        Event();
-        Event(bool manual_reset, bool initially_signaled);
-        ~Event();
+namespace TaskQueue {
 
-        void set();
-        void reset();
+class Event {
+public:
+    static const int kForever = -1;
 
-        bool wait(int give_up_after_ms, int warn_after_ms);
+    Event();
+    Event(bool manual_reset, bool initially_signaled);
+    ~Event();
 
-        bool wait(int give_up_after_ms){
-            return wait(give_up_after_ms, give_up_after_ms == kForever ? 3000:kForever);
-        }
+    void set();
+    void reset();
 
-        Event(const Event&) = delete;
-        Event& operator = (const Event&) = delete;
+    // Waits for the event to become signaled, but logs a warning if it takes more
+    // than `warn_after_ms` milliseconds, and gives up completely if it takes more
+    // than `give_up_after_ms` milliseconds. (If `warn_after_ms >=
+    // give_up_after_ms`, no warning will be logged.) Either or both may be
+    // `kForever`, which means wait indefinitely.
+    //
+    // Returns true if the event was signaled, false if there was a timeout or
+    // some other error.
+    bool wait(int give_up_after_ms, int warn_after_ms);
 
-    private:
-        std::mutex event_mutex;
-        std::condition_variable event_condition;
-        const bool is_manual_reset;
-        bool event_status;    
-
+    // Waits with the given timeout and a reasonable default warning timeout.
+    bool wait(int give_up_after_ms) {
+        return wait(give_up_after_ms, give_up_after_ms == kForever ? 3000 : kForever);
     }
 
-    
+private:
+    Event(const Event&) = delete;
+    Event& operator=(const Event&) = delete;
+
+private:
+    std::mutex event_mutex_;
+    std::condition_variable event_cond_;
+    const bool is_manual_reset_;
+    bool event_status_;
+};
 
 }
