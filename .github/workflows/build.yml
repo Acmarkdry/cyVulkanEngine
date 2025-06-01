@@ -1,0 +1,79 @@
+name: Build
+
+on:
+  push:
+    branches: [main, dev_*]
+  pull_request:
+    branches: [main]
+
+env:
+  VCPKG_COMMIT: "2024.08.23"
+  BUILD_TYPE: Release
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Vulkan SDK
+        uses: humbletim/setup-vulkan-sdk@v1.2.0
+        with:
+          vulkan-query-version: 1.3.290.0
+          vulkan-components: Vulkan-Headers, Vulkan-Loader, Glslang
+          vulkan-use-cache: true
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: build/vcpkg.windows
+          key: vcpkg-windows-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg_windows.bat') }}
+          restore-keys: |
+            vcpkg-windows-${{ env.VCPKG_COMMIT }}-
+
+      - name: Install vcpkg dependencies
+        shell: cmd
+        run: |
+          if not exist build mkdir build
+          cd build
+          if not exist vcpkg.windows (
+            git clone https://github.com/Microsoft/vcpkg.git vcpkg.windows
+            cd vcpkg.windows
+            git checkout %VCPKG_COMMIT%
+            call bootstrap-vcpkg.bat
+          ) else (
+            cd vcpkg.windows
+          )
+          vcpkg.exe install --recurse ^
+            cxxopts:x64-windows-static ^
+            glfw3:x64-windows-static ^
+            glm:x64-windows-static ^
+            imgui[core,freetype,glfw-binding,vulkan-binding,docking-experimental]:x64-windows-static ^
+            stb:x64-windows-static ^
+            tinyobjloader:x64-windows-static ^
+            curl:x64-windows-static ^
+            tinygltf:x64-windows-static ^
+            draco:x64-windows-static ^
+            rapidjson:x64-windows-static ^
+            fmt:x64-windows-static ^
+            meshoptimizer:x64-windows-static ^
+            ktx:x64-windows-static ^
+            joltphysics:x64-windows-static ^
+            cpp-base64:x64-windows-static
+
+      - name: Configure CMake
+        shell: cmd
+        run: |
+          cd build
+          if not exist windows mkdir windows
+          cd windows
+          cmake -D WITH_OIDN=0 -D WITH_AVIF=0 -D VCPKG_TARGET_TRIPLET=x64-windows-static -D CMAKE_TOOLCHAIN_FILE=../vcpkg.windows/scripts/buildsystems/vcpkg.cmake -G "Visual Studio 17 2022" -A "x64" ../..
+
+      - name: Build
+        shell: cmd
+        run: |
+          cd build/windows
+          msbuild cyNextRenderer.sln /p:Configuration=%BUILD_TYPE% /verbosity:minimal /nologo /m
